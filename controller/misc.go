@@ -51,29 +51,30 @@ func GetStatus(c *gin.Context) {
 	legalSetting := system_setting.GetLegalSettings()
 
 	data := gin.H{
-		"version":                     common.Version,
-		"start_time":                  common.StartTime,
-		"email_verification":          common.EmailVerificationEnabled,
-		"github_oauth":                common.GitHubOAuthEnabled,
-		"github_client_id":            common.GitHubClientId,
-		"discord_oauth":               system_setting.GetDiscordSettings().Enabled,
-		"discord_client_id":           system_setting.GetDiscordSettings().ClientId,
-		"linuxdo_oauth":               common.LinuxDOOAuthEnabled,
-		"linuxdo_client_id":           common.LinuxDOClientId,
-		"linuxdo_minimum_trust_level": common.LinuxDOMinimumTrustLevel,
-		"telegram_oauth":              common.TelegramOAuthEnabled,
-		"telegram_bot_name":           common.TelegramBotName,
-		"theme":                       "default",
-		"system_name":                 common.SystemName,
-		"logo":                        common.Logo,
-		"footer_html":                 common.Footer,
-		"wechat_qrcode":               common.WeChatAccountQRCodeImageURL,
-		"wechat_login":                common.WeChatAuthEnabled,
-		"server_address":              system_setting.ServerAddress,
-		"turnstile_check":             common.TurnstileCheckEnabled,
-		"turnstile_site_key":          common.TurnstileSiteKey,
-		"docs_link":                   operation_setting.GetGeneralSetting().DocsLink,
-		"quota_per_unit":              common.QuotaPerUnit,
+		"version":                      common.Version,
+		"start_time":                   common.StartTime,
+		"email_verification":           common.EmailVerificationEnabled,
+		"github_oauth":                 common.GitHubOAuthEnabled,
+		"github_client_id":             common.GitHubClientId,
+		"discord_oauth":                system_setting.GetDiscordSettings().Enabled,
+		"discord_client_id":            system_setting.GetDiscordSettings().ClientId,
+		"linuxdo_oauth":                common.LinuxDOOAuthEnabled,
+		"linuxdo_client_id":            common.LinuxDOClientId,
+		"linuxdo_minimum_trust_level":  common.LinuxDOMinimumTrustLevel,
+		"telegram_oauth":               common.TelegramOAuthEnabled,
+		"telegram_bot_name":            common.TelegramBotName,
+		"theme":                        "default",
+		"system_name":                  common.SystemName,
+		"logo":                         common.Logo,
+		"footer_html":                  common.Footer,
+		"wechat_qrcode":                common.WeChatAccountQRCodeImageURL,
+		"wechat_login":                 common.WeChatAuthEnabled,
+		"server_address":               system_setting.ServerAddress,
+		"turnstile_check":              common.TurnstileCheckEnabled,
+		"turnstile_site_key":           common.TurnstileSiteKey,
+		"registration_captcha_enabled": common.RegistrationCaptchaEnabled,
+		"docs_link":                    operation_setting.GetGeneralSetting().DocsLink,
+		"quota_per_unit":               common.QuotaPerUnit,
 		// 兼容旧前端：保留 display_in_currency，同时提供新的 quota_display_type
 		"display_in_currency":           operation_setting.IsCurrencyDisplay(),
 		"quota_display_type":            operation_setting.GetQuotaDisplayType(),
@@ -232,6 +233,29 @@ func GetHomePageContent(c *gin.Context) {
 		"data":    common.OptionMap["HomePageContent"],
 	})
 	return
+}
+
+func GetRegistrationCaptcha(c *gin.Context) {
+	if !common.RegistrationCaptchaEnabled {
+		common.ApiErrorI18n(c, i18n.MsgFeatureDisabled)
+		return
+	}
+	captcha, err := common.GenerateBehaviorCaptcha()
+	if err != nil {
+		common.ApiErrorI18n(c, i18n.MsgGenerateFailed)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"id": captcha.ID, "type": captcha.Type, "image": captcha.Image, "thumb": captcha.Thumb,
+			"thumb_x": captcha.ThumbX, "thumb_y": captcha.ThumbY,
+			"thumb_width": captcha.ThumbWidth, "thumb_height": captcha.ThumbHeight,
+			"thumb_size": captcha.ThumbSize,
+		},
+	})
 }
 
 func SendEmailVerification(c *gin.Context) {

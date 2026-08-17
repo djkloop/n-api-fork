@@ -203,6 +203,13 @@ func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin
 	})
 }
 
+type RegisterRequest struct {
+	model.User
+	CaptchaId      string                        `json:"captcha_id"`
+	CaptchaType    string                        `json:"captcha_type"`
+	CaptchaPayload common.BehaviorCaptchaPayload `json:"captcha_payload"`
+}
+
 func Register(c *gin.Context) {
 	if !common.RegisterEnabled {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
@@ -212,12 +219,17 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserPasswordRegisterDisabled)
 		return
 	}
-	var user model.User
-	err := common.DecodeJson(c.Request.Body, &user)
+	var req RegisterRequest
+	err := common.DecodeJson(c.Request.Body, &req)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	if common.RegistrationCaptchaEnabled && !common.VerifyBehaviorCaptcha(req.CaptchaId, req.CaptchaType, req.CaptchaPayload) {
+		common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)
+		return
+	}
+	user := req.User
 	user.Username = strings.TrimSpace(user.Username)
 	user.Email = model.NormalizeEmail(user.Email)
 	if user.Username == "" {

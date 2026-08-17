@@ -171,6 +171,10 @@ func GlobalAPIRateLimit() func(c *gin.Context) {
 	return defNext
 }
 
+func CaptchaRateLimit() func(c *gin.Context) {
+	return rateLimitFactory(30, 60, "CP")
+}
+
 func CriticalRateLimit() func(c *gin.Context) {
 	if common.CriticalRateLimitEnable {
 		return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "CT")

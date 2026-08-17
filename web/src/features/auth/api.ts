@@ -29,6 +29,7 @@ import type {
   Login2FAResponse,
   TwoFAPayload,
   RegisterPayload,
+  RegistrationCaptcha,
   ApiResponse,
 } from './types'
 
@@ -179,6 +180,18 @@ export async function telegramLogin(
 // ----------------------------------------------------------------------------
 // Registration
 // ----------------------------------------------------------------------------
+
+// Registration image captcha
+export async function getRegistrationCaptcha(): Promise<RegistrationCaptcha> {
+  const res = await api.get<ApiResponse<RegistrationCaptcha>>('/api/captcha', {
+    disableDuplicate: true,
+    skipAuthRefresh: true,
+  })
+  if (!res.data.success || !res.data.data) {
+    throw new Error(res.data.message || 'Failed to load captcha')
+  }
+  return res.data.data
+}
 
 // User registration
 export async function register(payload: RegisterPayload): Promise<ApiResponse> {

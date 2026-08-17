@@ -67,6 +67,8 @@ var LinuxDOOAuthEnabled = false
 var WeChatAuthEnabled = false
 var TelegramOAuthEnabled = false
 var TurnstileCheckEnabled = false
+var RegistrationCaptchaEnabled = true
+var RegistrationCaptchaWeights = "click:25,slide:25,drag:25,rotate:25"
 var RegisterEnabled = true
 
 var EmailDomainRestrictionEnabled = false // 是否启用邮箱域名限制

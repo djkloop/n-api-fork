@@ -17,8 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2 } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import GoCaptcha from 'go-captcha-react'
+import { Loader2, RefreshCw } from 'lucide-react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -38,7 +45,11 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { register, wechatLoginByCode } from '@/features/auth/api'
+import {
+  getRegistrationCaptcha,
+  register,
+  wechatLoginByCode,
+} from '@/features/auth/api'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { registerFormSchema } from '@/features/auth/constants'
@@ -49,6 +60,10 @@ import {
   getAffiliateCode,
   saveAffiliateCode,
 } from '@/features/auth/lib/storage'
+import type {
+  RegisterPayload,
+  RegistrationCaptcha,
+} from '@/features/auth/types'
 import { useStatus } from '@/hooks/use-status'
 import { isAuthBundle } from '@/lib/api'
 import { getServerErrorMessageKey } from '@/lib/server-error-message'
@@ -66,6 +81,16 @@ export function SignUpForm({
   const [isWeChatDialogOpen, setIsWeChatDialogOpen] = useState(false)
   const [isWeChatSubmitting, setIsWeChatSubmitting] = useState(false)
   const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0)
+  const [captchaId, setCaptchaId] = useState('')
+  const [captchaImage, setCaptchaImage] = useState('')
+  const [captchaType, setCaptchaType] =
+    useState<RegistrationCaptcha['type']>('click')
+  const [captchaPayload, setCaptchaPayload] =
+    useState<RegisterPayload['captcha_payload']>()
+  const [captchaData, setCaptchaData] = useState<RegistrationCaptcha | null>(
+    null
+  )
+  const [isCaptchaLoading, setIsCaptchaLoading] = useState(false)
   const legalConsentErrorMessage = t('Please agree to the legal terms first')
 
   const { status } = useStatus()
@@ -99,6 +124,10 @@ export function SignUpForm({
 
   const emailValue = form.watch('email')
   const emailVerificationRequired = !!status?.email_verification
+  const registrationCaptchaEnabled = Boolean(
+    status?.registration_captcha_enabled ??
+    status?.data?.registration_captcha_enabled
+  )
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
   const hasPrivacyPolicy = Boolean(status?.privacy_policy_enabled)
   const requiresLegalConsent = hasUserAgreement || hasPrivacyPolicy
@@ -108,6 +137,29 @@ export function SignUpForm({
     true
   const hasWeChatLogin = Boolean(status?.wechat_login)
   const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
+  const captchaReady =
+    !registrationCaptchaEnabled ||
+    (Boolean(captchaId) && Boolean(captchaImage) && Boolean(captchaPayload))
+
+  const loadCaptcha = useCallback(async () => {
+    if (!registrationCaptchaEnabled) return
+    setIsCaptchaLoading(true)
+    setCaptchaPayload(undefined)
+    setCaptchaImage('')
+    try {
+      const captcha = await getRegistrationCaptcha()
+      setCaptchaId(captcha.id)
+      setCaptchaImage(captcha.image)
+      setCaptchaType(captcha.type)
+      setCaptchaData(captcha)
+    } catch {
+      setCaptchaId('')
+      setCaptchaImage('')
+      toast.error(t('Failed to load captcha'))
+    } finally {
+      setIsCaptchaLoading(false)
+    }
+  }, [registrationCaptchaEnabled, t])
 
   const wechatQrCodeUrl = useMemo(() => {
     return (
@@ -122,6 +174,10 @@ export function SignUpForm({
       ''
     )
   }, [status])
+
+  useEffect(() => {
+    void loadCaptcha()
+  }, [loadCaptcha])
 
   useEffect(() => {
     if (requiresLegalConsent) {
@@ -157,6 +213,10 @@ export function SignUpForm({
     }
 
     if (!validateTurnstile()) return
+    if (registrationCaptchaEnabled && !captchaReady) {
+      toast.error(t('Please enter the image captcha'))
+      return
+    }
 
     setIsLoading(true)
     try {
@@ -167,6 +227,9 @@ export function SignUpForm({
         verification_code: verificationCode || undefined,
         aff_code: getAffiliateCode(),
         turnstile: turnstileToken,
+        captcha_id: captchaId || undefined,
+        captcha_type: captchaType,
+        captcha_payload: captchaPayload,
       })
 
       if (res?.success) {
@@ -174,8 +237,10 @@ export function SignUpForm({
         redirectToLogin()
       } else {
         toast.error(res?.message || t('Failed to create account'))
+        await loadCaptcha()
       }
     } catch {
+      await loadCaptcha()
       // Errors are handled by global interceptor
     } finally {
       setIsLoading(false)
@@ -238,6 +303,59 @@ export function SignUpForm({
     })
   } else if (isSendingCode) {
     verificationCodeAction = <Loader2 className='h-4 w-4 animate-spin' />
+  }
+
+  let captchaVisual: ReactNode = <RefreshCw className='h-5 w-5' />
+  if (isCaptchaLoading) {
+    captchaVisual = <Loader2 className='h-5 w-5 animate-spin' />
+  } else if (captchaData) {
+    const data = {
+      image: captchaData.image,
+      thumb: captchaData.thumb,
+      thumbX: captchaData.thumb_x ?? 0,
+      thumbY: captchaData.thumb_y ?? 0,
+      thumbWidth: captchaData.thumb_width ?? 0,
+      thumbHeight: captchaData.thumb_height ?? 0,
+      thumbSize: captchaData.thumb_size ?? 0,
+    }
+    if (captchaType === 'click') {
+      captchaVisual = (
+        <GoCaptcha.Click
+          data={data}
+          events={{
+            confirm: (dots) =>
+              setCaptchaPayload({
+                click_points: dots.map((dot) => ({ x: dot.x, y: dot.y })),
+              }),
+          }}
+        />
+      )
+    } else if (captchaType === 'slide') {
+      captchaVisual = (
+        <GoCaptcha.Slide
+          data={data}
+          events={{
+            confirm: (point) => setCaptchaPayload({ x: point.x, y: point.y }),
+          }}
+        />
+      )
+    } else if (captchaType === 'drag') {
+      captchaVisual = (
+        <GoCaptcha.SlideRegion
+          data={data}
+          events={{
+            confirm: (point) => setCaptchaPayload({ x: point.x, y: point.y }),
+          }}
+        />
+      )
+    } else {
+      captchaVisual = (
+        <GoCaptcha.Rotate
+          data={data}
+          events={{ confirm: (angle) => setCaptchaPayload({ angle }) }}
+        />
+      )
+    }
   }
 
   return (
@@ -346,6 +464,26 @@ export function SignUpForm({
           </>
         )}
 
+        {registrationCaptchaEnabled && (
+          <div className='grid gap-2'>
+            <div className='flex items-center justify-between'>
+              <Label>{t('Human verification')}</Label>
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                onClick={() => void loadCaptcha()}
+                disabled={isCaptchaLoading}
+                title={t('Refresh captcha')}
+                aria-label={t('Refresh captcha')}
+              >
+                <RefreshCw className='h-4 w-4' />
+              </Button>
+            </div>
+            {captchaVisual}
+          </div>
+        )}
+
         {/* Turnstile */}
         {isTurnstileEnabled && (
           <div className='mt-2'>
@@ -371,7 +509,9 @@ export function SignUpForm({
           disabled={
             isLoading ||
             (requiresLegalConsent && !agreedToLegal) ||
-            !turnstileReady
+            !turnstileReady ||
+            !captchaReady ||
+            isCaptchaLoading
           }
         >
           {isLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : null}

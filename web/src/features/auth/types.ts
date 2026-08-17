@@ -40,6 +40,26 @@ export interface RegisterPayload {
   verification_code?: string
   aff_code?: string
   turnstile?: string
+  captcha_id?: string
+  captcha_type?: string
+  captcha_payload?: {
+    click_points?: Array<{ x: number; y: number }>
+    x?: number
+    y?: number
+    angle?: number
+  }
+}
+
+export interface RegistrationCaptcha {
+  id: string
+  type: 'click' | 'slide' | 'drag' | 'rotate'
+  image: string
+  thumb: string
+  thumb_x?: number
+  thumb_y?: number
+  thumb_width?: number
+  thumb_height?: number
+  thumb_size?: number
 }
 
 export interface PasswordResetPayload {
@@ -118,6 +138,7 @@ export interface SystemStatus {
     WeChatAccountQRCodeImageURL?: string
     turnstile_check?: boolean
     turnstile_site_key?: string
+    registration_captcha_enabled?: boolean
     email_verification?: boolean
     self_use_mode_enabled?: boolean
     display_in_currency?: boolean
@@ -163,6 +184,7 @@ export interface SystemStatus {
   WeChatAccountQRCodeImageURL?: string
   turnstile_check?: boolean
   turnstile_site_key?: string
+  registration_captcha_enabled?: boolean
   email_verification?: boolean
   self_use_mode_enabled?: boolean
   display_in_currency?: boolean
