@@ -727,6 +727,7 @@
     "Capabilities": "Capacités",
     "Caps the response length": "Limite la longueur de la réponse",
     "Captcha type weights": "Poids des types de CAPTCHA",
+    "Captcha verified successfully": "Captcha vérifié avec succès",
     "Capture a reusable bundle of models, tags, or endpoints.": "Capturez un ensemble réutilisable de modèles, d'étiquettes ou de points de terminaison.",
     "Card view": "Vue cartes",
     "Catch-all route must be last for the same incoming path": "Le routage de secours doit être le dernier pour le même chemin d'entrée",

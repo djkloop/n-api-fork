@@ -727,6 +727,7 @@
     "Capabilities": "機能",
     "Caps the response length": "応答の長さを制限します",
     "Captcha type weights": "CAPTCHAタイプの重み",
+    "Captcha verified successfully": "CAPTCHA の検証に成功しました",
     "Capture a reusable bundle of models, tags, or endpoints.": "モデル、タグ、またはエンドポイントの再利用可能なバンドルを保存。",
     "Card view": "カード表示",
     "Catch-all route must be last for the same incoming path": "同じ入力パスのキャッチオールルートは最後に配置してください",

@@ -212,6 +212,7 @@ describe('SignUpForm behavior captcha', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Confirm captcha' })
     )
+    await screen.findByText('Captcha verified successfully')
     await userEvent.click(screen.getByRole('button', { name: 'Send code' }))
 
     await waitFor(() => {
@@ -243,7 +244,6 @@ describe('SignUpForm behavior captcha', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Confirm captcha' })
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Send code' }))
 
     await waitFor(() => {
       expect(mocks.verifyRegistrationCaptcha).toHaveBeenCalledOnce()

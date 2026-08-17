@@ -727,6 +727,7 @@
     "Capabilities": "能力",
     "Caps the response length": "限制回复长度",
     "Captcha type weights": "验证码类型权重",
+    "Captcha verified successfully": "验证码验证成功",
     "Capture a reusable bundle of models, tags, or endpoints.": "捕获可重用的模型、标签或端点捆绑包。",
     "Card view": "卡片视图",
     "Catch-all route must be last for the same incoming path": "同一入口路径的兜底路由必须放在最后",

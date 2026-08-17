@@ -727,6 +727,7 @@
     "Capabilities": "Khả năng",
     "Caps the response length": "Giới hạn độ dài phản hồi",
     "Captcha type weights": "Trọng số loại CAPTCHA",
+    "Captcha verified successfully": "Xác minh CAPTCHA thành công",
     "Capture a reusable bundle of models, tags, or endpoints.": "Đóng gói một bộ có thể tái sử dụng gồm các mô hình, thẻ hoặc điểm cuối.",
     "Card view": "Dạng thẻ",
     "Catch-all route must be last for the same incoming path": "Tuyến dự phòng phải đứng cuối cho cùng đường dẫn đầu vào",

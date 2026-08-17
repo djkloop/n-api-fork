@@ -727,6 +727,7 @@
     "Capabilities": "Возможности",
     "Caps the response length": "Ограничивает длину ответа",
     "Captcha type weights": "Веса типов CAPTCHA",
+    "Captcha verified successfully": "CAPTCHA успешно проверена",
     "Capture a reusable bundle of models, tags, or endpoints.": "Создайте повторно используемый набор моделей, тегов или конечных точек.",
     "Card view": "Карточки",
     "Catch-all route must be last for the same incoming path": "Резервный маршрут должен быть последним для этого входного пути",

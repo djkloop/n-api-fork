@@ -88,6 +88,7 @@ export function SignUpForm({
     useState<RegistrationCaptcha['type']>('click')
   const [captchaPayload, setCaptchaPayload] =
     useState<RegisterPayload['captcha_payload']>()
+  const [captchaVerified, setCaptchaVerified] = useState(false)
   const [captchaData, setCaptchaData] = useState<RegistrationCaptcha | null>(
     null
   )
@@ -141,12 +142,16 @@ export function SignUpForm({
   const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
   const captchaReady =
     !registrationCaptchaEnabled ||
-    (Boolean(captchaId) && Boolean(captchaImage) && Boolean(captchaPayload))
+    (Boolean(captchaId) &&
+      Boolean(captchaImage) &&
+      Boolean(captchaPayload) &&
+      (!emailVerificationRequired || captchaVerified))
 
   const loadCaptcha = useCallback(async () => {
     if (!registrationCaptchaEnabled) return
     setIsCaptchaLoading(true)
     setCaptchaPayload(undefined)
+    setCaptchaVerified(false)
     setCaptchaImage('')
     try {
       const captcha = await getRegistrationCaptcha()
@@ -166,6 +171,27 @@ export function SignUpForm({
   const handleCaptchaRefresh = useCallback(() => {
     void loadCaptcha()
   }, [loadCaptcha])
+
+  const handleCaptchaConfirm = useCallback(
+    async (payload: NonNullable<RegisterPayload['captcha_payload']>) => {
+      setCaptchaPayload(payload)
+      setCaptchaVerified(false)
+      if (!emailVerificationRequired) return
+
+      const verified = await verifyRegistrationCaptcha({
+        captcha_id: captchaId,
+        captcha_type: captchaType,
+        captcha_payload: payload,
+      })
+      if (verified?.success) {
+        setCaptchaVerified(true)
+        return
+      }
+      toast.error(verified?.message || t('Image captcha is incorrect'))
+      await loadCaptcha()
+    },
+    [captchaId, captchaType, emailVerificationRequired, loadCaptcha, t]
+  )
 
   const wechatQrCodeUrl = useMemo(() => {
     return (
@@ -266,14 +292,6 @@ export function SignUpForm({
             captcha_payload: captchaPayload,
           }
         : undefined
-    if (captcha) {
-      const verified = await verifyRegistrationCaptcha(captcha)
-      if (!verified?.success) {
-        toast.error(verified?.message || t('Image captcha is incorrect'))
-        await loadCaptcha()
-        return
-      }
-    }
     const sent = await sendCode(emailValue || '', captcha)
     if (registrationCaptchaEnabled) {
       await loadCaptcha()
@@ -355,7 +373,7 @@ export function SignUpForm({
           events={{
             refresh: handleCaptchaRefresh,
             confirm: (dots) =>
-              setCaptchaPayload({
+              void handleCaptchaConfirm({
                 click_points: dots.map((dot) => ({ x: dot.x, y: dot.y })),
               }),
           }}
@@ -367,7 +385,8 @@ export function SignUpForm({
           data={data}
           events={{
             refresh: handleCaptchaRefresh,
-            confirm: (point) => setCaptchaPayload({ x: point.x, y: point.y }),
+            confirm: (point) =>
+              void handleCaptchaConfirm({ x: point.x, y: point.y }),
           }}
         />
       )
@@ -377,7 +396,8 @@ export function SignUpForm({
           data={data}
           events={{
             refresh: handleCaptchaRefresh,
-            confirm: (point) => setCaptchaPayload({ x: point.x, y: point.y }),
+            confirm: (point) =>
+              void handleCaptchaConfirm({ x: point.x, y: point.y }),
           }}
         />
       )
@@ -387,7 +407,7 @@ export function SignUpForm({
           data={data}
           events={{
             refresh: handleCaptchaRefresh,
-            confirm: (angle) => setCaptchaPayload({ angle }),
+            confirm: (angle) => void handleCaptchaConfirm({ angle }),
           }}
         />
       )
@@ -519,7 +539,11 @@ export function SignUpForm({
                 aria-live='polite'
               >
                 <CheckCircle2 className='h-4 w-4' aria-hidden='true' />
-                {t('Challenge completed. It will be verified when you submit.')}
+                {t(
+                  captchaVerified
+                    ? 'Captcha verified successfully'
+                    : 'Challenge completed. It will be verified when you submit.'
+                )}
               </p>
             ) : null}
           </div>

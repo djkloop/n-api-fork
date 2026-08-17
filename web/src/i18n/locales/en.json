@@ -727,6 +727,7 @@
     "Capabilities": "Capabilities",
     "Caps the response length": "Caps the response length",
     "Captcha type weights": "Captcha type weights",
+    "Captcha verified successfully": "Captcha verified successfully",
     "Capture a reusable bundle of models, tags, or endpoints.": "Capture a reusable bundle of models, tags, or endpoints.",
     "Card view": "Card view",
     "Catch-all route must be last for the same incoming path": "Catch-all route must be last for the same incoming path",
