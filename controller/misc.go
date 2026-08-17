@@ -258,13 +258,30 @@ func GetRegistrationCaptcha(c *gin.Context) {
 	})
 }
 
+func VerifyRegistrationCaptcha(c *gin.Context) {
+	if !common.RegistrationCaptchaEnabled {
+		common.ApiErrorI18n(c, i18n.MsgFeatureDisabled)
+		return
+	}
+	var payload common.BehaviorCaptchaPayload
+	if common.UnmarshalJsonStr(c.Query("captcha_payload"), &payload) != nil ||
+		!common.VerifyBehaviorCaptchaForEmail(c.Query("captcha_id"), c.Query("captcha_type"), payload) {
+		common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
 func SendEmailVerification(c *gin.Context) {
 	if common.RegistrationCaptchaEnabled && c.GetInt("id") == 0 {
-		var payload common.BehaviorCaptchaPayload
-		if common.UnmarshalJsonStr(c.Query("captcha_payload"), &payload) != nil ||
-			!common.VerifyBehaviorCaptcha(c.Query("captcha_id"), c.Query("captcha_type"), payload) {
-			common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)
-			return
+		verified := common.ConsumeVerifiedBehaviorCaptcha(c.Query("captcha_id"), c.Query("captcha_type"))
+		if !verified {
+			var payload common.BehaviorCaptchaPayload
+			if common.UnmarshalJsonStr(c.Query("captcha_payload"), &payload) != nil ||
+				!common.VerifyBehaviorCaptcha(c.Query("captcha_id"), c.Query("captcha_type"), payload) {
+				common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)
+				return
+			}
 		}
 	}
 	email := model.NormalizeEmail(c.Query("email"))

@@ -53,6 +53,7 @@ type behaviorCaptchaStore struct {
 }
 
 var behaviorStore = &behaviorCaptchaStore{values: make(map[string]behaviorCaptchaState)}
+var verifiedBehaviorStore = &behaviorCaptchaStore{values: make(map[string]behaviorCaptchaState)}
 var behaviorResources struct {
 	once   sync.Once
 	font   *truetype.Font
@@ -267,6 +268,55 @@ func VerifyBehaviorCaptcha(id, typ string, payload BehaviorCaptchaPayload) bool 
 	if !ok || state.Type != typ {
 		return false
 	}
+	return validateBehaviorCaptcha(state, typ, payload)
+}
+
+func VerifyBehaviorCaptchaForEmail(id, typ string, payload BehaviorCaptchaPayload) bool {
+	id = strings.TrimSpace(id)
+	if !VerifyBehaviorCaptcha(id, typ, payload) {
+		return false
+	}
+	return storeVerifiedBehaviorCaptcha(id, behaviorCaptchaState{Type: typ, ExpiresAt: time.Now().Add(registrationCaptchaTTL)}) == nil
+}
+
+func ConsumeVerifiedBehaviorCaptcha(id, typ string) bool {
+	state, ok := consumeStoredBehaviorCaptcha(verifiedBehaviorStore, registrationCaptchaRedisPrefix+"verified:", id)
+	return ok && state.Type == typ
+}
+
+func storeVerifiedBehaviorCaptcha(id string, state behaviorCaptchaState) error {
+	if RedisEnabled && RDB != nil {
+		data, err := Marshal(state)
+		if err != nil {
+			return err
+		}
+		return RDB.Set(context.Background(), registrationCaptchaRedisPrefix+"verified:"+id, data, registrationCaptchaTTL).Err()
+	}
+	verifiedBehaviorStore.mu.Lock()
+	defer verifiedBehaviorStore.mu.Unlock()
+	verifiedBehaviorStore.values[id] = state
+	return nil
+}
+
+func consumeStoredBehaviorCaptcha(store *behaviorCaptchaStore, redisPrefix, id string) (behaviorCaptchaState, bool) {
+	var state behaviorCaptchaState
+	id = strings.TrimSpace(id)
+	if RedisEnabled && RDB != nil {
+		key := redisPrefix + id
+		data, err := RDB.Eval(context.Background(), `local value=redis.call('GET',KEYS[1]); if value then redis.call('DEL',KEYS[1]) end; return value`, []string{key}).Text()
+		if err != nil || Unmarshal([]byte(data), &state) != nil {
+			return state, false
+		}
+		return state, time.Now().Before(state.ExpiresAt)
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	state, ok := store.values[id]
+	delete(store.values, id)
+	return state, ok && time.Now().Before(state.ExpiresAt)
+}
+
+func validateBehaviorCaptcha(state behaviorCaptchaState, typ string, payload BehaviorCaptchaPayload) bool {
 	switch typ {
 	case CaptchaTypeClick:
 		if len(payload.ClickPoints) != len(state.ClickPoints) {

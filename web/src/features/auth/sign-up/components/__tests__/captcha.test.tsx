@@ -22,6 +22,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getRegistrationCaptcha: vi.fn(),
+  verifyRegistrationCaptcha: vi.fn(),
   register: vi.fn(),
   redirectToLogin: vi.fn(),
   sendCode: vi.fn(),
@@ -38,6 +39,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/features/auth/api', () => ({
   getRegistrationCaptcha: mocks.getRegistrationCaptcha,
   register: mocks.register,
+  verifyRegistrationCaptcha: mocks.verifyRegistrationCaptcha,
   wechatLoginByCode: vi.fn(),
 }))
 
@@ -140,6 +142,8 @@ const captcha = (id: string, image = 'first') => ({
 describe('SignUpForm behavior captcha', () => {
   beforeEach(() => {
     mocks.getRegistrationCaptcha.mockReset()
+    mocks.verifyRegistrationCaptcha.mockReset()
+    mocks.verifyRegistrationCaptcha.mockResolvedValue({ success: true })
     mocks.register.mockReset()
     mocks.redirectToLogin.mockReset()
     mocks.sendCode.mockReset()
@@ -211,6 +215,11 @@ describe('SignUpForm behavior captcha', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send code' }))
 
     await waitFor(() => {
+      expect(mocks.verifyRegistrationCaptcha).toHaveBeenCalledWith({
+        captcha_id: 'captcha-1',
+        captcha_type: 'click',
+        captcha_payload: { click_points: [{ x: 10, y: 10 }] },
+      })
       expect(mocks.sendCode).toHaveBeenCalledOnce()
       expect(mocks.getRegistrationCaptcha).toHaveBeenCalledTimes(2)
     })
@@ -219,22 +228,36 @@ describe('SignUpForm behavior captcha', () => {
     ).toBeDisabled()
   })
 
-  test('refreshes the challenge and invalidates the previous interaction', async () => {
-    mocks.getRegistrationCaptcha
-      .mockResolvedValueOnce(captcha('captcha-1'))
-      .mockResolvedValueOnce(captcha('captcha-2', 'second'))
+  test('does not send an email code when captcha verification fails', async () => {
+    mocks.status.email_verification = true
+    mocks.verifyRegistrationCaptcha.mockResolvedValue({
+      success: false,
+      message: 'Image captcha is incorrect',
+    })
 
     render(<SignUpForm />)
-    await screen.findByRole('button', { name: 'Confirm captcha' })
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Refresh captcha' })
+    await userEvent.type(
+      screen.getByPlaceholderText('name@example.com'),
+      'alice@example.com'
     )
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Confirm captcha' })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Send code' }))
 
     await waitFor(() => {
+      expect(mocks.verifyRegistrationCaptcha).toHaveBeenCalledOnce()
       expect(mocks.getRegistrationCaptcha).toHaveBeenCalledTimes(2)
     })
+    expect(mocks.sendCode).not.toHaveBeenCalled()
+  })
+
+  test('does not render a separate refresh button beside the challenge', async () => {
+    render(<SignUpForm />)
+    await screen.findByRole('button', { name: 'Confirm captcha' })
+
     expect(
-      screen.getByRole('button', { name: 'Create account' })
-    ).toBeDisabled()
+      screen.queryByRole('button', { name: 'Refresh captcha' })
+    ).not.toBeInTheDocument()
   })
 })

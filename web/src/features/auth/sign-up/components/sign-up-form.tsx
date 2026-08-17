@@ -48,6 +48,7 @@ import { Label } from '@/components/ui/label'
 import {
   getRegistrationCaptcha,
   register,
+  verifyRegistrationCaptcha,
   wechatLoginByCode,
 } from '@/features/auth/api'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
@@ -162,6 +163,10 @@ export function SignUpForm({
     }
   }, [registrationCaptchaEnabled, t])
 
+  const handleCaptchaRefresh = useCallback(() => {
+    void loadCaptcha()
+  }, [loadCaptcha])
+
   const wechatQrCodeUrl = useMemo(() => {
     return (
       status?.wechat_qrcode ||
@@ -261,6 +266,14 @@ export function SignUpForm({
             captcha_payload: captchaPayload,
           }
         : undefined
+    if (captcha) {
+      const verified = await verifyRegistrationCaptcha(captcha)
+      if (!verified?.success) {
+        toast.error(verified?.message || t('Image captcha is incorrect'))
+        await loadCaptcha()
+        return
+      }
+    }
     const sent = await sendCode(emailValue || '', captcha)
     if (registrationCaptchaEnabled) {
       await loadCaptcha()
@@ -340,6 +353,7 @@ export function SignUpForm({
         <GoCaptcha.Click
           data={data}
           events={{
+            refresh: handleCaptchaRefresh,
             confirm: (dots) =>
               setCaptchaPayload({
                 click_points: dots.map((dot) => ({ x: dot.x, y: dot.y })),
@@ -352,6 +366,7 @@ export function SignUpForm({
         <GoCaptcha.Slide
           data={data}
           events={{
+            refresh: handleCaptchaRefresh,
             confirm: (point) => setCaptchaPayload({ x: point.x, y: point.y }),
           }}
         />
@@ -361,6 +376,7 @@ export function SignUpForm({
         <GoCaptcha.SlideRegion
           data={data}
           events={{
+            refresh: handleCaptchaRefresh,
             confirm: (point) => setCaptchaPayload({ x: point.x, y: point.y }),
           }}
         />
@@ -369,7 +385,10 @@ export function SignUpForm({
       captchaVisual = (
         <GoCaptcha.Rotate
           data={data}
-          events={{ confirm: (angle) => setCaptchaPayload({ angle }) }}
+          events={{
+            refresh: handleCaptchaRefresh,
+            confirm: (angle) => setCaptchaPayload({ angle }),
+          }}
         />
       )
     }
@@ -486,17 +505,6 @@ export function SignUpForm({
           <div className='grid gap-2'>
             <div className='flex items-center justify-between'>
               <Label>{t('Human verification')}</Label>
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon'
-                onClick={() => void loadCaptcha()}
-                disabled={isCaptchaLoading}
-                title={t('Refresh captcha')}
-                aria-label={t('Refresh captcha')}
-              >
-                <RefreshCw className='h-4 w-4' />
-              </Button>
             </div>
             <div
               className='mx-auto w-fit max-w-full overflow-x-auto'

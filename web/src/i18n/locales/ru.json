@@ -2308,6 +2308,7 @@
     "Ignored upstream models": "Игнорируемые upstream-модели",
     "Image": "Изображение",
     "Image captcha": "Изображение CAPTCHA",
+    "Image captcha is incorrect": "Неверная графическая CAPTCHA",
     "Image Generation": "Генерация изображений",
     "Image In": "Вход изображения",
     "Image input": "Ввод изображения",

@@ -194,6 +194,22 @@ export async function getRegistrationCaptcha(): Promise<RegistrationCaptcha> {
   return res.data.data
 }
 
+// Verify registration captcha before sending an email verification code
+export async function verifyRegistrationCaptcha(
+  captcha: BehaviorCaptchaAttempt
+): Promise<ApiResponse> {
+  const res = await api.get('/api/captcha/verify', {
+    params: {
+      captcha_id: captcha.captcha_id,
+      captcha_type: captcha.captcha_type,
+      captcha_payload: JSON.stringify(captcha.captcha_payload),
+    },
+    disableDuplicate: true,
+    skipAuthRefresh: true,
+  })
+  return res.data
+}
+
 // User registration
 export async function register(payload: RegisterPayload): Promise<ApiResponse> {
   const res = await api.post(`/api/user/register`, payload, {

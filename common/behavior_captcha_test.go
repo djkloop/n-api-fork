@@ -2,6 +2,7 @@ package common
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,30 @@ func TestBehaviorCaptchaClickPointsPreserveChallengeOrder(t *testing.T) {
 		{X: 10, Y: 20, W: 8, H: 9},
 		{X: 30, Y: 40, W: 12, H: 14},
 	}, behaviorCaptchaClickPoints(dots))
+}
+
+func TestVerifiedEmailCaptchaCanOnlyBeConsumedOnce(t *testing.T) {
+	originalRedisEnabled := RedisEnabled
+	originalRDB := RDB
+	RedisEnabled = false
+	RDB = nil
+	t.Cleanup(func() {
+		RedisEnabled = originalRedisEnabled
+		RDB = originalRDB
+	})
+
+	id := "email-captcha"
+	behaviorStore.mu.Lock()
+	behaviorStore.values[id] = behaviorCaptchaState{
+		Type:       CaptchaTypeSlide,
+		SlidePoint: BehaviorCaptchaPoint{X: 50, Y: 10},
+		ExpiresAt:  time.Now().Add(time.Minute),
+	}
+	behaviorStore.mu.Unlock()
+
+	assert.True(t, VerifyBehaviorCaptchaForEmail(id, CaptchaTypeSlide, BehaviorCaptchaPayload{X: 50, Y: 10}))
+	assert.True(t, ConsumeVerifiedBehaviorCaptcha(id, CaptchaTypeSlide))
+	assert.False(t, ConsumeVerifiedBehaviorCaptcha(id, CaptchaTypeSlide))
 }
 
 func TestGeneratedSlideCaptchasValidateTargetInsteadOfInitialPosition(t *testing.T) {
