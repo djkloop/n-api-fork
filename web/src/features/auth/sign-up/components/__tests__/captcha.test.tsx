@@ -24,6 +24,15 @@ const mocks = vi.hoisted(() => ({
   getRegistrationCaptcha: vi.fn(),
   register: vi.fn(),
   redirectToLogin: vi.fn(),
+  sendCode: vi.fn(),
+  status: {
+    registration_captcha_enabled: true,
+    email_verification: false,
+    oauth_register_enabled: false,
+    wechat_login: false,
+    user_agreement_enabled: false,
+    privacy_policy_enabled: false,
+  },
 }))
 
 vi.mock('@/features/auth/api', () => ({
@@ -70,16 +79,7 @@ vi.mock('go-captcha-react', () => ({
 }))
 
 vi.mock('@/hooks/use-status', () => ({
-  useStatus: () => ({
-    status: {
-      registration_captcha_enabled: true,
-      email_verification: false,
-      oauth_register_enabled: false,
-      wechat_login: false,
-      user_agreement_enabled: false,
-      privacy_policy_enabled: false,
-    },
-  }),
+  useStatus: () => ({ status: mocks.status }),
 }))
 
 vi.mock('@/features/auth/hooks/use-turnstile', () => ({
@@ -97,7 +97,7 @@ vi.mock('@/features/auth/hooks/use-email-verification', () => ({
     isSending: false,
     secondsLeft: 0,
     isActive: false,
-    sendCode: vi.fn(),
+    sendCode: mocks.sendCode,
   }),
 }))
 
@@ -142,6 +142,9 @@ describe('SignUpForm behavior captcha', () => {
     mocks.getRegistrationCaptcha.mockReset()
     mocks.register.mockReset()
     mocks.redirectToLogin.mockReset()
+    mocks.sendCode.mockReset()
+    mocks.sendCode.mockResolvedValue(false)
+    mocks.status.email_verification = false
     mocks.getRegistrationCaptcha.mockResolvedValue(captcha('captcha-1'))
     mocks.register.mockResolvedValue({ success: true, message: '' })
   })
@@ -189,6 +192,31 @@ describe('SignUpForm behavior captcha', () => {
         })
       )
     })
+  })
+
+  test('refreshes a consumed challenge when sending email fails', async () => {
+    mocks.status.email_verification = true
+    mocks.getRegistrationCaptcha
+      .mockResolvedValueOnce(captcha('captcha-1'))
+      .mockResolvedValueOnce(captcha('captcha-2', 'second'))
+
+    render(<SignUpForm />)
+    await userEvent.type(
+      screen.getByPlaceholderText('name@example.com'),
+      'alice@example.com'
+    )
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Confirm captcha' })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+    await waitFor(() => {
+      expect(mocks.sendCode).toHaveBeenCalledOnce()
+      expect(mocks.getRegistrationCaptcha).toHaveBeenCalledTimes(2)
+    })
+    expect(
+      screen.getByRole('button', { name: 'Create account' })
+    ).toBeDisabled()
   })
 
   test('refreshes the challenge and invalidates the previous interaction', async () => {

@@ -261,10 +261,13 @@ export function SignUpForm({
             captcha_payload: captchaPayload,
           }
         : undefined
-    if (await sendCode(emailValue || '', captcha)) {
+    const sent = await sendCode(emailValue || '', captcha)
+    if (registrationCaptchaEnabled) {
+      await loadCaptcha()
+    }
+    if (sent) {
       setTurnstileToken('')
       setTurnstileWidgetKey((current) => current + 1)
-      await loadCaptcha()
     }
   }
 
