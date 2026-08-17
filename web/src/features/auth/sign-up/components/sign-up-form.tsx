@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import GoCaptcha from 'go-captcha-react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -114,6 +114,7 @@ export function SignUpForm({
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     resolver: zodResolver(registerFormSchema),
+    mode: 'onChange',
     defaultValues: {
       username: '',
       email: '',
@@ -495,6 +496,18 @@ export function SignUpForm({
               </Button>
             </div>
             {captchaVisual}
+            {captchaPayload ? (
+              <p
+                className='flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400'
+                role='status'
+                aria-live='polite'
+              >
+                <CheckCircle2 className='h-4 w-4' aria-hidden='true' />
+                {t(
+                  'Challenge completed. It will be verified when you submit.'
+                )}
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -522,6 +535,8 @@ export function SignUpForm({
           className='mt-2 w-full justify-center gap-2'
           disabled={
             isLoading ||
+            !form.formState.isValid ||
+            (emailVerificationRequired && !verificationCode.trim()) ||
             (requiresLegalConsent && !agreedToLegal) ||
             !turnstileReady ||
             !captchaReady ||

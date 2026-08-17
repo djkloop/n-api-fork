@@ -146,6 +146,20 @@ describe('SignUpForm behavior captcha', () => {
     mocks.register.mockResolvedValue({ success: true, message: '' })
   })
 
+  test('keeps registration disabled when only the captcha is complete', async () => {
+    render(<SignUpForm />)
+    const createButton = screen.getByRole('button', { name: 'Create account' })
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Confirm captcha' })
+    )
+
+    expect(createButton).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Challenge completed. It will be verified when you submit.'
+    )
+  })
+
   test('requires completing the challenge before registration', async () => {
     render(<SignUpForm />)
     const createButton = screen.getByRole('button', { name: 'Create account' })
