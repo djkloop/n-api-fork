@@ -33,6 +33,19 @@ export interface TwoFAPayload {
   flow_token: string
 }
 
+export interface BehaviorCaptchaPayload {
+  click_points?: Array<{ x: number; y: number }>
+  x?: number
+  y?: number
+  angle?: number
+}
+
+export interface BehaviorCaptchaAttempt {
+  captcha_id: string
+  captcha_type: RegistrationCaptcha['type']
+  captcha_payload: BehaviorCaptchaPayload
+}
+
 export interface RegisterPayload {
   username: string
   password: string
@@ -42,12 +55,7 @@ export interface RegisterPayload {
   turnstile?: string
   captcha_id?: string
   captcha_type?: string
-  captcha_payload?: {
-    click_points?: Array<{ x: number; y: number }>
-    x?: number
-    y?: number
-    angle?: number
-  }
+  captcha_payload?: BehaviorCaptchaPayload
 }
 
 export interface RegistrationCaptcha {

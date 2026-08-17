@@ -259,6 +259,14 @@ func GetRegistrationCaptcha(c *gin.Context) {
 }
 
 func SendEmailVerification(c *gin.Context) {
+	if common.RegistrationCaptchaEnabled && c.GetInt("id") == 0 {
+		var payload common.BehaviorCaptchaPayload
+		if common.UnmarshalJsonStr(c.Query("captcha_payload"), &payload) != nil ||
+			!common.VerifyBehaviorCaptcha(c.Query("captcha_id"), c.Query("captcha_type"), payload) {
+			common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)
+			return
+		}
+	}
 	email := model.NormalizeEmail(c.Query("email"))
 	if err := common.Validate.Var(email, "required,email"); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)

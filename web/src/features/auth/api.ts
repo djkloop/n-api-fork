@@ -30,6 +30,7 @@ import type {
   TwoFAPayload,
   RegisterPayload,
   RegistrationCaptcha,
+  BehaviorCaptchaAttempt,
   ApiResponse,
 } from './types'
 
@@ -204,10 +205,19 @@ export async function register(payload: RegisterPayload): Promise<ApiResponse> {
 // Send email verification code
 export async function sendEmailVerification(
   email: string,
-  turnstile?: string
+  turnstile?: string,
+  captcha?: BehaviorCaptchaAttempt
 ): Promise<ApiResponse> {
   const res = await api.get('/api/verification', {
-    params: { email, turnstile },
+    params: {
+      email,
+      turnstile,
+      captcha_id: captcha?.captcha_id,
+      captcha_type: captcha?.captcha_type,
+      captcha_payload: captcha
+        ? JSON.stringify(captcha.captcha_payload)
+        : undefined,
+    },
   })
   return res.data
 }

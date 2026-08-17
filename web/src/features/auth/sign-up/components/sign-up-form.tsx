@@ -248,9 +248,22 @@ export function SignUpForm({
   }
 
   async function handleSendVerificationCode() {
-    if (await sendCode(emailValue || '')) {
+    if (registrationCaptchaEnabled && !captchaReady) {
+      toast.error(t('Please enter the image captcha'))
+      return
+    }
+    const captcha =
+      registrationCaptchaEnabled && captchaPayload
+        ? {
+            captcha_id: captchaId,
+            captcha_type: captchaType,
+            captcha_payload: captchaPayload,
+          }
+        : undefined
+    if (await sendCode(emailValue || '', captcha)) {
       setTurnstileToken('')
       setTurnstileWidgetKey((current) => current + 1)
+      await loadCaptcha()
     }
   }
 
@@ -454,7 +467,8 @@ export function SignUpForm({
                   isSendingCode ||
                   isActive ||
                   !emailValue ||
-                  !turnstileReady
+                  !turnstileReady ||
+                  !captchaReady
                 }
                 onClick={handleSendVerificationCode}
               >

@@ -31,6 +31,22 @@ func TestGetRegistrationCaptchaReturnsImage(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), "data:image/png;base64,")
 }
 
+func TestSendEmailVerificationRejectsMissingCaptcha(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	originalEnabled := common.RegistrationCaptchaEnabled
+	common.RegistrationCaptchaEnabled = true
+	t.Cleanup(func() { common.RegistrationCaptchaEnabled = originalEnabled })
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/verification?email=test@example.com", nil)
+
+	SendEmailVerification(ctx)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+}
+
 func TestRegisterRejectsMissingCaptchaBeforeDatabaseAccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	originalRegisterEnabled := common.RegisterEnabled
