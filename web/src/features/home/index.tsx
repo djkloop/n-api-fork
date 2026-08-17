@@ -40,7 +40,12 @@ export function Home() {
   const syncIframePreferences = useCallback(() => {
     try {
       iframeRef.current?.contentWindow?.postMessage(
-        { themeMode: resolvedTheme },
+        {
+          themeMode: resolvedTheme,
+          theme: resolvedTheme,
+          colorMode: resolvedTheme,
+          isDark: resolvedTheme === 'dark',
+        },
         '*'
       )
       iframeRef.current?.contentWindow?.postMessage(
@@ -84,6 +89,7 @@ export function Home() {
             ref={iframeRef}
             src={content}
             className='h-screen w-full border-none'
+            style={{ colorScheme: resolvedTheme }}
             title={t('Custom Home Page')}
             sandbox='allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts allow-top-navigation-by-user-activation'
             onLoad={syncIframePreferences}
