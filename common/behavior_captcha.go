@@ -143,6 +143,15 @@ func randomBehaviorCaptchaType() string {
 	return CaptchaTypeClick
 }
 
+func behaviorCaptchaClickPoints(dots map[int]*click.Dot) []BehaviorCaptchaPoint {
+	points := make([]BehaviorCaptchaPoint, 0, len(dots))
+	for i := 0; i < len(dots); i++ {
+		dot := dots[i]
+		points = append(points, BehaviorCaptchaPoint{X: dot.X, Y: dot.Y, W: dot.Width, H: dot.Height})
+	}
+	return points
+}
+
 func storeBehaviorCaptcha(id string, state behaviorCaptchaState) error {
 	if RedisEnabled && RDB != nil {
 		data, err := Marshal(state)
@@ -178,11 +187,14 @@ func consumeBehaviorCaptcha(id string) (behaviorCaptchaState, bool) {
 }
 
 func GenerateBehaviorCaptcha() (BehaviorCaptchaResponse, error) {
+	return generateBehaviorCaptcha(randomBehaviorCaptchaType())
+}
+
+func generateBehaviorCaptcha(typ string) (BehaviorCaptchaResponse, error) {
 	if err := loadBehaviorCaptchaResources(); err != nil {
 		return BehaviorCaptchaResponse{}, err
 	}
 	id := uuid.NewString()
-	typ := randomBehaviorCaptchaType()
 	state := behaviorCaptchaState{Type: typ, ExpiresAt: time.Now().Add(registrationCaptchaTTL)}
 	response := BehaviorCaptchaResponse{ID: id, Type: typ}
 	var err error
@@ -200,9 +212,7 @@ func GenerateBehaviorCaptcha() (BehaviorCaptchaResponse, error) {
 			}
 		}
 		if err == nil {
-			for _, dot := range data.GetData() {
-				state.ClickPoints = append(state.ClickPoints, BehaviorCaptchaPoint{X: dot.X, Y: dot.Y, W: dot.Width, H: dot.Height})
-			}
+			state.ClickPoints = behaviorCaptchaClickPoints(data.GetData())
 		}
 	case CaptchaTypeSlide, CaptchaTypeDrag:
 		builder := slide.NewBuilder(slide.WithGenGraphNumber(1))
@@ -223,7 +233,7 @@ func GenerateBehaviorCaptcha() (BehaviorCaptchaResponse, error) {
 		}
 		if err == nil {
 			block := data.GetData()
-			state.SlidePoint = BehaviorCaptchaPoint{X: block.DX, Y: block.DY}
+			state.SlidePoint = BehaviorCaptchaPoint{X: block.X, Y: block.Y}
 			response.ThumbX, response.ThumbY, response.ThumbWidth, response.ThumbHeight = block.DX, block.DY, block.Width, block.Height
 		}
 	case CaptchaTypeRotate:

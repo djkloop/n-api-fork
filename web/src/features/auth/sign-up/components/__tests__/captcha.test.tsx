@@ -146,6 +146,14 @@ describe('SignUpForm behavior captcha', () => {
     mocks.register.mockResolvedValue({ success: true, message: '' })
   })
 
+  test('centers the captcha within the registration form', async () => {
+    render(<SignUpForm />)
+
+    await screen.findByRole('button', { name: 'Confirm captcha' })
+
+    expect(screen.getByTestId('registration-captcha')).toHaveClass('mx-auto')
+  })
+
   test('keeps registration disabled when only the captcha is complete', async () => {
     render(<SignUpForm />)
     const createButton = screen.getByRole('button', { name: 'Create account' })

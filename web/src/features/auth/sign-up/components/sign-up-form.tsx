@@ -495,7 +495,12 @@ export function SignUpForm({
                 <RefreshCw className='h-4 w-4' />
               </Button>
             </div>
-            {captchaVisual}
+            <div
+              className='mx-auto w-fit max-w-full overflow-x-auto'
+              data-testid='registration-captcha'
+            >
+              {captchaVisual}
+            </div>
             {captchaPayload ? (
               <p
                 className='flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400'
@@ -503,9 +508,7 @@ export function SignUpForm({
                 aria-live='polite'
               >
                 <CheckCircle2 className='h-4 w-4' aria-hidden='true' />
-                {t(
-                  'Challenge completed. It will be verified when you submit.'
-                )}
+                {t('Challenge completed. It will be verified when you submit.')}
               </p>
             ) : null}
           </div>
