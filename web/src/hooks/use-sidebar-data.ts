@@ -29,6 +29,7 @@ import {
   Radio,
   ServerCog,
   Settings,
+  ShieldBan,
   Ticket,
   User,
   Users,
@@ -36,7 +37,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { type SidebarData } from '@/components/layout/types'
+import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
 
 /**
@@ -138,6 +139,11 @@ export function useSidebarData(): SidebarData {
             title: t('Redemption Codes'),
             url: '/redemption-codes',
             icon: Ticket,
+          },
+          {
+            title: t('IP Blackroom'),
+            url: '/ip-bans',
+            icon: ShieldBan,
           },
           {
             title: t('Subscriptions'),

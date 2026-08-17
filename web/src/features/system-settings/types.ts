@@ -16,6 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+export type RegistrationProtectionSetting = {
+  id: number
+  enabled: number
+  threshold: number
+  window_hours: number
+  duration_hours: number
+  updated_at: number
+}
+
+export type RegistrationProtectionResponse = {
+  success: boolean
+  message: string
+  data: RegistrationProtectionSetting
+}
+
 export type SystemOption = {
   key: string
   value: string

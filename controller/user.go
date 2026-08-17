@@ -211,6 +211,13 @@ type RegisterRequest struct {
 }
 
 func Register(c *gin.Context) {
+	if banned, err := model.IsIPBanned(c.ClientIP()); err != nil {
+		common.ApiError(c, err)
+		return
+	} else if banned {
+		common.ApiErrorI18n(c, i18n.MsgUserRegistrationIPBlocked)
+		return
+	}
 	if !common.RegisterEnabled {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
 		return
@@ -329,6 +336,10 @@ func Register(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgCreateDefaultTokenErr)
 			return
 		}
+	}
+
+	if _, err := model.RecordRegistrationIP(c.ClientIP(), insertedUser.Id); err != nil {
+		common.SysError(fmt.Sprintf("failed to record registration IP %s: %v", c.ClientIP(), err))
 	}
 
 	c.JSON(http.StatusOK, gin.H{

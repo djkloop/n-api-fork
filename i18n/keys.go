@@ -78,6 +78,7 @@ const (
 const (
 	MsgUserPasswordLoginDisabled     = "user.password_login_disabled"
 	MsgUserRegisterDisabled          = "user.register_disabled"
+	MsgUserRegistrationIPBlocked     = "user.registration_ip_blocked"
 	MsgUserPasswordRegisterDisabled  = "user.password_register_disabled"
 	MsgUserUsernameOrPasswordEmpty   = "user.username_or_password_empty"
 	MsgUserUsernameOrPasswordError   = "user.username_or_password_error"

@@ -22,6 +22,7 @@ import type {
   ConfirmPaymentComplianceResponse,
   FetchUpstreamRatiosRequest,
   LogCleanupTask,
+  RegistrationProtectionResponse,
   SystemOptionsResponse,
   SystemTaskListResponse,
   SystemTaskResponse,
@@ -38,6 +39,23 @@ export async function getSystemOptions() {
 
 export async function updateSystemOption(request: UpdateOptionRequest) {
   const res = await api.put<UpdateOptionResponse>('/api/option/', request)
+  return res.data
+}
+
+export async function getRegistrationProtectionSetting() {
+  const res = await api.get<RegistrationProtectionResponse>(
+    '/api/option/registration-protection'
+  )
+  return res.data
+}
+
+export async function updateRegistrationProtectionSetting(
+  setting: Omit<RegistrationProtectionResponse['data'], 'id' | 'updated_at'>
+) {
+  const res = await api.put<RegistrationProtectionResponse>(
+    '/api/option/registration-protection',
+    setting
+  )
   return res.data
 }
 

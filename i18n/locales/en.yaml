@@ -66,6 +66,7 @@ redemption.expire_time_invalid: "Expiration time cannot be earlier than current 
 # User messages
 user.password_login_disabled: "Password login has been disabled by administrator"
 user.register_disabled: "New user registration has been disabled by administrator"
+user.registration_ip_blocked: "Registration from this IP is temporarily unavailable"
 user.password_register_disabled: "Password registration has been disabled by administrator, please use third-party account verification"
 user.username_or_password_empty: "Username or password is empty"
 user.username_or_password_error: "Username or password is incorrect, or user has been banned"

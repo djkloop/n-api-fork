@@ -154,6 +154,10 @@ export function SidebarModulesSection({
         title: t('Subscription Management'),
         description: t('Manage subscription plans and pricing.'),
       },
+      ipBan: {
+        title: t('IP Blackroom'),
+        description: t('Manage manual and automatic registration IP blocks.'),
+      },
     },
   }
   const formDefaults = useMemo(() => config, [config])

@@ -42,6 +42,7 @@ import {
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
+import { RegistrationProtectionSection } from './registration-protection-section'
 
 const botProtectionSchema = z.object({
   RegistrationCaptchaEnabled: z.boolean(),
@@ -111,139 +112,145 @@ export function BotProtectionSection({
   }
 
   return (
-    <SettingsSection title={t('Bot Protection')}>
-      <Form {...form}>
-        <SettingsForm onSubmit={form.handleSubmit(onSubmit)} autoComplete='off'>
-          <SettingsPageFormActions
-            onSave={form.handleSubmit(onSubmit)}
-            isSaving={updateOption.isPending}
-          />
-          <FormField
-            control={form.control}
-            name='RegistrationCaptchaEnabled'
-            render={({ field }) => (
-              <SettingsSwitchItem>
-                <SettingsSwitchContent>
-                  <FormLabel>{t('Enable image captcha')}</FormLabel>
+    <>
+      <SettingsSection title={t('Bot Protection')}>
+        <Form {...form}>
+          <SettingsForm
+            onSubmit={form.handleSubmit(onSubmit)}
+            autoComplete='off'
+          >
+            <SettingsPageFormActions
+              onSave={form.handleSubmit(onSubmit)}
+              isSaving={updateOption.isPending}
+            />
+            <FormField
+              control={form.control}
+              name='RegistrationCaptchaEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Enable image captcha')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Protect password registration with a locally generated image captcha'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='RegistrationCaptchaWeights'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Captcha type weights')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Protect password registration with a locally generated image captcha'
+                      'Comma-separated weights for click, slide, drag, and rotate captcha types'
                     )}
                   </FormDescription>
-                </SettingsSwitchContent>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-              </SettingsSwitchItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name='RegistrationCaptchaWeights'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('Captcha type weights')}</FormLabel>
-                <FormDescription>
-                  {t(
-                    'Comma-separated weights for click, slide, drag, and rotate captcha types'
-                  )}
-                </FormDescription>
-                <FormControl>
-                  <div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
-                    {captchaWeightTypes.map(({ key, label }) => (
-                      <div key={key} className='grid gap-1'>
-                        <FormLabel className='text-xs'>{t(label)}</FormLabel>
-                        <Input
-                          type='number'
-                          min={0}
-                          max={100}
-                          step={1}
-                          inputMode='numeric'
-                          value={getCaptchaWeight(field.value, key)}
-                          onChange={(event) =>
-                            field.onChange(
-                              setCaptchaWeight(
-                                field.value,
-                                key,
-                                event.target.value
+                  <FormControl>
+                    <div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
+                      {captchaWeightTypes.map(({ key, label }) => (
+                        <div key={key} className='grid gap-1'>
+                          <FormLabel className='text-xs'>{t(label)}</FormLabel>
+                          <Input
+                            type='number'
+                            min={0}
+                            max={100}
+                            step={1}
+                            inputMode='numeric'
+                            value={getCaptchaWeight(field.value, key)}
+                            onChange={(event) =>
+                              field.onChange(
+                                setCaptchaWeight(
+                                  field.value,
+                                  key,
+                                  event.target.value
+                                )
                               )
-                            )
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name='TurnstileCheckEnabled'
-            render={({ field }) => (
-              <SettingsSwitchItem>
-                <SettingsSwitchContent>
-                  <FormLabel>{t('Enable Turnstile')}</FormLabel>
-                  <FormDescription>
-                    {t(
-                      'Protect login and registration with Cloudflare Turnstile'
-                    )}
-                  </FormDescription>
-                </SettingsSwitchContent>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-              </SettingsSwitchItem>
-            )}
-          />
+            <FormField
+              control={form.control}
+              name='TurnstileCheckEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Enable Turnstile')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Protect login and registration with Cloudflare Turnstile'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name='TurnstileSiteKey'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('Site Key')}</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder={t('Your Turnstile site key')}
-                    autoComplete='off'
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <FormField
+              control={form.control}
+              name='TurnstileSiteKey'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Site Key')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Your Turnstile site key')}
+                      autoComplete='off'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name='TurnstileSecretKey'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('Secret Key')}</FormLabel>
-                <FormControl>
-                  <Input
-                    type='password'
-                    placeholder={t('Your Turnstile secret key')}
-                    autoComplete='new-password'
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </SettingsForm>
-      </Form>
-    </SettingsSection>
+            <FormField
+              control={form.control}
+              name='TurnstileSecretKey'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Secret Key')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='password'
+                      placeholder={t('Your Turnstile secret key')}
+                      autoComplete='new-password'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </SettingsForm>
+        </Form>
+      </SettingsSection>
+      <RegistrationProtectionSection />
+    </>
   )
 }
