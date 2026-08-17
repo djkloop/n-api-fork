@@ -15,6 +15,7 @@ type SSRFProtection struct {
 	DomainList             []string // domain format, e.g. example.com, *.example.com
 	IpFilterMode           bool     // true: 白名单, false: 黑名单
 	IpList                 []string // CIDR or single IP
+	DeniedIPList           []string // dynamic exact IP deny overlay
 	AllowedPorts           []int    // 允许的端口范围
 	ApplyIPFilterForDomain bool     // 对域名启用IP过滤
 }
@@ -253,6 +254,9 @@ func isIPListed(ip net.IP, list []string) bool {
 
 // IsIPAccessAllowed 检查IP是否允许访问
 func (p *SSRFProtection) IsIPAccessAllowed(ip net.IP) bool {
+	if isIPListed(ip, p.DeniedIPList) {
+		return false
+	}
 	// 私有IP限制
 	if isPrivateIP(ip) && !p.AllowPrivateIp {
 		return false

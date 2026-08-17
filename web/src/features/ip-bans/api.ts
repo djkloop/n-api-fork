@@ -24,6 +24,7 @@ export type IPBan = {
   reason: string
   source: 'manual' | 'automatic'
   expires_at: number
+  block_outbound: boolean
   created_at: number
   display_status: 'active' | 'expired' | 'released'
 }
@@ -51,6 +52,7 @@ export async function getIPBans(keyword = ''): Promise<ApiResult<PageData>> {
 export async function createIPBan(data: {
   ip: string
   reason: string
+  block_outbound: boolean
   expires_at: number
 }) {
   const response = await api.post('/api/user/ip-bans', data)

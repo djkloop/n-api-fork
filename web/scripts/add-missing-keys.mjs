@@ -215,6 +215,62 @@ for (const [locale, additions] of Object.entries(protectionValues)) {
   Object.assign(values[locale], additions)
 }
 
+const ssrfLinkValues = {
+  en: {
+    'Also block outbound SSRF access': 'Also block outbound SSRF access',
+    SSRF: 'SSRF',
+    'Outbound SSRF blocking': 'Outbound SSRF blocking',
+    'Enabled': 'Enabled',
+    'Disabled': 'Disabled',
+  },
+  zh: {
+    'Also block outbound SSRF access': '同时阻止服务器通过 SSRF 访问',
+    SSRF: 'SSRF',
+    'Outbound SSRF blocking': '出站 SSRF 封禁',
+    'Enabled': '已启用',
+    'Disabled': '未启用',
+  },
+  'zh-TW': {
+    'Also block outbound SSRF access': '同時阻止伺服器透過 SSRF 存取',
+    SSRF: 'SSRF',
+    'Outbound SSRF blocking': '出站 SSRF 封鎖',
+    'Enabled': '已啟用',
+    'Disabled': '未啟用',
+  },
+  fr: {
+    'Also block outbound SSRF access': 'Bloquer aussi l’accès SSRF sortant',
+    SSRF: 'SSRF',
+    'Outbound SSRF blocking': 'Blocage SSRF sortant',
+    'Enabled': 'Activé',
+    'Disabled': 'Désactivé',
+  },
+  ja: {
+    'Also block outbound SSRF access': '外向き SSRF アクセスもブロック',
+    SSRF: 'SSRF',
+    'Outbound SSRF blocking': '外向き SSRF ブロック',
+    Enabled: '有効',
+    Disabled: '無効',
+  },
+  ru: {
+    'Also block outbound SSRF access': 'Также блокировать исходящий SSRF-доступ',
+    SSRF: 'SSRF',
+    'Outbound SSRF blocking': 'Блокировка исходящего SSRF',
+    Enabled: 'Включено',
+    Disabled: 'Отключено',
+  },
+  vi: {
+    'Also block outbound SSRF access': 'Đồng thời chặn truy cập SSRF đi',
+    SSRF: 'SSRF',
+    'Outbound SSRF blocking': 'Chặn SSRF đi',
+    Enabled: 'Đã bật',
+    Disabled: 'Đã tắt',
+  },
+}
+
+for (const [locale, additions] of Object.entries(ssrfLinkValues)) {
+  Object.assign(values[locale], additions)
+}
+
 for (const [locale, additions] of Object.entries(values)) {
   const file = path.join(dir, `${locale}.json`)
   const json = JSON.parse(await fs.readFile(file, 'utf8'))

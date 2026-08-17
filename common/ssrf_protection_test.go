@@ -50,6 +50,19 @@ func TestSSRFProtectionRejectsResolvedPrivateIP(t *testing.T) {
 	require.Error(t, protection.ValidateResolvedIP("example.com", net.ParseIP("169.254.169.254")))
 }
 
+func TestSSRFProtectionRejectsDynamicDeniedIPBeforeConfiguredFilter(t *testing.T) {
+	protection := &SSRFProtection{
+		AllowPrivateIp:   true,
+		DomainFilterMode: false,
+		IpFilterMode:     true,
+		IpList:           []string{"203.0.113.10/32"},
+		DeniedIPList:     []string{"198.51.100.20"},
+	}
+
+	require.Error(t, protection.ValidateNetworkTarget("198.51.100.20", 443))
+	require.NoError(t, protection.ValidateNetworkTarget("203.0.113.10", 443))
+}
+
 func TestNewSSRFProtectionFromFetchSettingParsesPortRanges(t *testing.T) {
 	protection, err := NewSSRFProtectionFromFetchSetting(false, false, false, nil, nil, []string{"80", "8000-8001"}, true)
 	require.NoError(t, err)

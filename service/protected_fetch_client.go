@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/setting/system_setting"
 )
 
 type ssrfResolver interface {
@@ -35,24 +34,7 @@ type ssrfProtectedRoundTripper struct {
 }
 
 func currentFetchProtection() (*common.SSRFProtection, bool, error) {
-	fetchSetting := system_setting.GetFetchSetting()
-	if !fetchSetting.EnableSSRFProtection {
-		return nil, false, nil
-	}
-
-	protection, err := common.NewSSRFProtectionFromFetchSetting(
-		fetchSetting.AllowPrivateIp,
-		fetchSetting.DomainFilterMode,
-		fetchSetting.IpFilterMode,
-		fetchSetting.DomainList,
-		fetchSetting.IpList,
-		fetchSetting.AllowedPorts,
-		fetchSetting.ApplyIPFilterForDomain,
-	)
-	if err != nil {
-		return nil, true, err
-	}
-	return protection, true, nil
+	return currentFetchProtectionWithDomainFilter(true)
 }
 
 func newProtectedFetchHTTPClient() *http.Client {

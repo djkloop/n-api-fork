@@ -20,7 +20,7 @@ func resetIPBanTables(t *testing.T) {
 func TestIPBanLifecycleHonorsExpiryAndRelease(t *testing.T) {
 	resetIPBanTables(t)
 
-	ban, err := UpsertIPBan("192.0.2.10", "abuse", IPBanSourceManual, common.GetTimestamp()+60)
+	ban, err := UpsertIPBan("192.0.2.10", "abuse", IPBanSourceManual, common.GetTimestamp()+60, false)
 	require.NoError(t, err)
 
 	blocked, err := IsIPBanned("192.0.2.10")
@@ -32,7 +32,7 @@ func TestIPBanLifecycleHonorsExpiryAndRelease(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, blocked)
 
-	_, err = UpsertIPBan("192.0.2.11", "expired", IPBanSourceManual, time.Now().Add(-time.Minute).Unix())
+	_, err = UpsertIPBan("192.0.2.11", "expired", IPBanSourceManual, time.Now().Add(-time.Minute).Unix(), false)
 	require.NoError(t, err)
 	blocked, err = IsIPBanned("192.0.2.11")
 	require.NoError(t, err)

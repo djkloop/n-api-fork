@@ -28,6 +28,7 @@ type IPBan struct {
 	UpdatedAt     int64  `json:"updated_at" gorm:"bigint"`
 	ReleasedAt    int64  `json:"released_at,omitempty" gorm:"bigint"`
 	ReleasedBy    int    `json:"released_by,omitempty"`
+	BlockOutbound bool   `json:"block_outbound"`
 	DisplayStatus string `json:"display_status" gorm:"-"`
 }
 
@@ -59,6 +60,13 @@ func IsIPBanned(ip string) (bool, error) {
 	return err == nil, err
 }
 
+func ListActiveOutboundBlockedIPs() ([]string, error) {
+	var ips []string
+	err := DB.Model(&IPBan{}).
+		Where("block_outbound = ? AND status = ? AND (expires_at = 0 OR expires_at > ?)", true, IPBanStatusActive, common.GetTimestamp()).
+		Pluck("ip", &ips).Error
+	return ips, err
+}
 func ListIPBans(startIdx, limit int, keyword string) ([]*IPBan, int64, error) {
 	query := DB.Model(&IPBan{})
 	if keyword = strings.TrimSpace(keyword); keyword != "" {
@@ -90,7 +98,7 @@ func ListIPBans(startIdx, limit int, keyword string) ([]*IPBan, int64, error) {
 	return bans, total, nil
 }
 
-func UpsertIPBan(ip, reason, source string, expiresAt int64) (*IPBan, error) {
+func UpsertIPBan(ip, reason, source string, expiresAt int64, blockOutbound bool) (*IPBan, error) {
 	normalized, err := normalizeIP(ip)
 	if err != nil {
 		return nil, err
@@ -102,7 +110,7 @@ func UpsertIPBan(ip, reason, source string, expiresAt int64) (*IPBan, error) {
 	var ban IPBan
 	err = DB.Where("ip = ?", normalized).First(&ban).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		ban = IPBan{IP: normalized, Reason: strings.TrimSpace(reason), Source: source, Status: IPBanStatusActive, ExpiresAt: expiresAt, CreatedAt: now, UpdatedAt: now}
+		ban = IPBan{IP: normalized, Reason: strings.TrimSpace(reason), Source: source, Status: IPBanStatusActive, ExpiresAt: expiresAt, BlockOutbound: blockOutbound, CreatedAt: now, UpdatedAt: now}
 		return &ban, DB.Create(&ban).Error
 	}
 	if err != nil {
@@ -112,6 +120,7 @@ func UpsertIPBan(ip, reason, source string, expiresAt int64) (*IPBan, error) {
 	ban.Source = source
 	ban.Status = IPBanStatusActive
 	ban.ExpiresAt = expiresAt
+	ban.BlockOutbound = blockOutbound
 	ban.ReleasedAt = 0
 	ban.ReleasedBy = 0
 	ban.UpdatedAt = now
@@ -161,6 +170,6 @@ func RecordRegistrationIP(ip string, userID int) (bool, error) {
 	if setting.DurationHours > 0 {
 		expiresAt = now + int64(setting.DurationHours)*3600
 	}
-	_, err = UpsertIPBan(normalized, "automatic registration abuse threshold exceeded", IPBanSourceAuto, expiresAt)
+	_, err = UpsertIPBan(normalized, "automatic registration abuse threshold exceeded", IPBanSourceAuto, expiresAt, false)
 	return true, err
 }

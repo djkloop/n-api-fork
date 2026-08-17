@@ -13,6 +13,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -26,6 +27,11 @@ var (
 		clients: make(map[string]*http.Client),
 		aliases: make(map[string]string),
 	}
+	dynamicSSRFIPCache struct {
+		mutex    sync.Mutex
+		ips      []string
+		loadedAt time.Time
+	}
 	legacyProxyURLWarnings sync.Map
 )
 
@@ -38,6 +44,52 @@ type proxyHTTPClientCache struct {
 type proxyURLConfig struct {
 	parsedURL *url.URL
 	cacheKey  string
+}
+
+func InvalidateDynamicSSRFIPCache() {
+	dynamicSSRFIPCache.mutex.Lock()
+	dynamicSSRFIPCache.loadedAt = time.Time{}
+	dynamicSSRFIPCache.mutex.Unlock()
+}
+
+func getDynamicSSRFBlockedIPs() ([]string, error) {
+	dynamicSSRFIPCache.mutex.Lock()
+	defer dynamicSSRFIPCache.mutex.Unlock()
+	if time.Since(dynamicSSRFIPCache.loadedAt) < 10*time.Second {
+		return append([]string(nil), dynamicSSRFIPCache.ips...), nil
+	}
+	ips, err := model.ListActiveOutboundBlockedIPs()
+	if err != nil {
+		common.SysError("failed to load dynamic SSRF IP blocks: " + err.Error())
+		return nil, nil
+	}
+	dynamicSSRFIPCache.ips = ips
+	dynamicSSRFIPCache.loadedAt = time.Now()
+	return append([]string(nil), ips...), nil
+}
+
+func currentFetchProtectionWithDomainFilter(applyDomainIPFilter bool) (*common.SSRFProtection, bool, error) {
+	fetchSetting := system_setting.GetFetchSetting()
+	if !fetchSetting.EnableSSRFProtection {
+		return nil, false, nil
+	}
+	protection, err := common.NewSSRFProtectionFromFetchSetting(
+		fetchSetting.AllowPrivateIp,
+		fetchSetting.DomainFilterMode,
+		fetchSetting.IpFilterMode,
+		fetchSetting.DomainList,
+		fetchSetting.IpList,
+		fetchSetting.AllowedPorts,
+		applyDomainIPFilter && fetchSetting.ApplyIPFilterForDomain,
+	)
+	if err != nil {
+		return nil, true, err
+	}
+	protection.DeniedIPList, err = getDynamicSSRFBlockedIPs()
+	if err != nil {
+		return nil, true, err
+	}
+	return protection, true, nil
 }
 
 func checkRedirect(req *http.Request, via []*http.Request) error {
@@ -63,8 +115,14 @@ func checkProtectedFetchRedirect(req *http.Request, via []*http.Request) error {
 }
 
 func validateURLWithCurrentFetchSetting(urlStr string, applyDomainIPFilter bool) error {
-	fetchSetting := system_setting.GetFetchSetting()
-	return common.ValidateURLWithFetchSetting(urlStr, fetchSetting.EnableSSRFProtection, fetchSetting.AllowPrivateIp, fetchSetting.DomainFilterMode, fetchSetting.IpFilterMode, fetchSetting.DomainList, fetchSetting.IpList, fetchSetting.AllowedPorts, applyDomainIPFilter && fetchSetting.ApplyIPFilterForDomain)
+	protection, enabled, err := currentFetchProtectionWithDomainFilter(applyDomainIPFilter)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return nil
+	}
+	return protection.ValidateURL(urlStr)
 }
 
 func ValidateSSRFProtectedFetchURL(urlStr string) error {

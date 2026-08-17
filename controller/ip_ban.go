@@ -7,14 +7,16 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type IPBanRequest struct {
-	IP        string `json:"ip"`
-	Reason    string `json:"reason"`
-	ExpiresAt int64  `json:"expires_at"`
+	IP            string `json:"ip"`
+	Reason        string `json:"reason"`
+	ExpiresAt     int64  `json:"expires_at"`
+	BlockOutbound bool   `json:"block_outbound"`
 }
 
 func GetIPBans(c *gin.Context) {
@@ -39,14 +41,15 @@ func CreateIPBan(c *gin.Context) {
 		common.ApiErrorMsg(c, "expiration must be in the future or zero for permanent")
 		return
 	}
-	ban, err := model.UpsertIPBan(req.IP, req.Reason, model.IPBanSourceManual, req.ExpiresAt)
+	ban, err := model.UpsertIPBan(req.IP, req.Reason, model.IPBanSourceManual, req.ExpiresAt, req.BlockOutbound)
 	if err != nil {
 		common.ApiErrorMsg(c, err.Error())
 		return
 	}
+	service.InvalidateDynamicSSRFIPCache()
 	operatorID := c.GetInt("id")
 	model.RecordOperationAuditLog(operatorID, "Manually blocked IP "+ban.IP, c.ClientIP(), "ip_ban.create", map[string]interface{}{
-		"ip": ban.IP, "reason": ban.Reason, "expires_at": ban.ExpiresAt,
+		"ip": ban.IP, "reason": ban.Reason, "expires_at": ban.ExpiresAt, "block_outbound": ban.BlockOutbound,
 	}, nil, nil)
 	common.ApiSuccess(c, ban)
 }
@@ -65,6 +68,7 @@ func ReleaseIPBan(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	service.InvalidateDynamicSSRFIPCache()
 	model.RecordOperationAuditLog(c.GetInt("id"), "Released IP ban", c.ClientIP(), "ip_ban.release", gin.H{"id": id}, nil, nil)
 	common.ApiSuccess(c, gin.H{"id": id})
 }

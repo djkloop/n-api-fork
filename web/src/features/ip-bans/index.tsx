@@ -1,5 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ShieldBan, ShieldCheck } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -15,9 +13,10 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ShieldBan, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -25,6 +24,7 @@ import { toast } from 'sonner'
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -46,6 +46,7 @@ export function IPBans() {
   const [keyword, setKeyword] = useState('')
   const [ip, setIp] = useState('')
   const [reason, setReason] = useState('')
+  const [blockOutbound, setBlockOutbound] = useState(false)
   const [hours, setHours] = useState('24')
 
   const query = useQuery({
@@ -60,6 +61,7 @@ export function IPBans() {
       toast.success(t('IP blocked successfully'))
       setIp('')
       setReason('')
+      setBlockOutbound(false)
       invalidate()
     },
     onError: () => toast.error(t('Failed to block IP')),
@@ -82,6 +84,7 @@ export function IPBans() {
     createMutation.mutate({
       ip: ip.trim(),
       reason: reason.trim() || t('Manual block'),
+      block_outbound: blockOutbound,
       expires_at:
         duration === 0 ? 0 : Math.floor(Date.now() / 1000) + duration * 3600,
     })
@@ -119,6 +122,15 @@ export function IPBans() {
               value={hours}
               onChange={(event) => setHours(event.target.value)}
             />
+            <label className='flex items-center gap-2 text-sm'>
+              <Checkbox
+                checked={blockOutbound}
+                onCheckedChange={(checked) =>
+                  setBlockOutbound(checked === true)
+                }
+              />
+              {t('Also block outbound SSRF access')}
+            </label>
             <Button onClick={submit} disabled={createMutation.isPending}>
               <ShieldBan className='mr-2 size-4' />
               {t('Block IP')}
@@ -139,6 +151,7 @@ export function IPBans() {
                   <TableHead>{t('IP address')}</TableHead>
                   <TableHead>{t('Reason')}</TableHead>
                   <TableHead>{t('Source')}</TableHead>
+                  <TableHead>{t('SSRF')}</TableHead>
                   <TableHead>{t('Expires at')}</TableHead>
                   <TableHead>{t('Status')}</TableHead>
                   <TableHead className='text-right'>{t('Actions')}</TableHead>
@@ -153,6 +166,9 @@ export function IPBans() {
                       {ban.source === 'automatic'
                         ? t('Automatic')
                         : t('Manual')}
+                    </TableCell>
+                    <TableCell>
+                      {ban.block_outbound ? t('Enabled') : t('Disabled')}
                     </TableCell>
                     <TableCell>
                       {formatTime(ban.expires_at, t('Permanent'))}
