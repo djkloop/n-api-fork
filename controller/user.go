@@ -225,9 +225,12 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if common.RegistrationCaptchaEnabled && !common.VerifyBehaviorCaptcha(req.CaptchaId, req.CaptchaType, req.CaptchaPayload) {
-		common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)
-		return
+	if common.RegistrationCaptchaEnabled {
+		verified := common.ConsumeVerifiedBehaviorCaptcha(req.CaptchaId, req.CaptchaType)
+		if !verified && !common.VerifyBehaviorCaptcha(req.CaptchaId, req.CaptchaType, req.CaptchaPayload) {
+			common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)
+			return
+		}
 	}
 	user := req.User
 	user.Username = strings.TrimSpace(user.Username)

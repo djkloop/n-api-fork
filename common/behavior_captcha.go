@@ -40,11 +40,12 @@ type BehaviorCaptchaPoint struct {
 }
 
 type behaviorCaptchaState struct {
-	Type        string
-	ClickPoints []BehaviorCaptchaPoint
-	SlidePoint  BehaviorCaptchaPoint
-	RotateAngle int
-	ExpiresAt   time.Time
+	Type         string
+	ClickPoints  []BehaviorCaptchaPoint
+	SlidePoint   BehaviorCaptchaPoint
+	RotateAngle  int
+	ExpiresAt    time.Time
+	VerifiedUses int
 }
 
 type behaviorCaptchaStore struct {
@@ -276,7 +277,7 @@ func VerifyBehaviorCaptchaForEmail(id, typ string, payload BehaviorCaptchaPayloa
 	if !VerifyBehaviorCaptcha(id, typ, payload) {
 		return false
 	}
-	return storeVerifiedBehaviorCaptcha(id, behaviorCaptchaState{Type: typ, ExpiresAt: time.Now().Add(registrationCaptchaTTL)}) == nil
+	return storeVerifiedBehaviorCaptcha(id, behaviorCaptchaState{Type: typ, VerifiedUses: 2, ExpiresAt: time.Now().Add(registrationCaptchaTTL)}) == nil
 }
 
 func ConsumeVerifiedBehaviorCaptcha(id, typ string) bool {
@@ -303,17 +304,39 @@ func consumeStoredBehaviorCaptcha(store *behaviorCaptchaStore, redisPrefix, id s
 	id = strings.TrimSpace(id)
 	if RedisEnabled && RDB != nil {
 		key := redisPrefix + id
-		data, err := RDB.Eval(context.Background(), `local value=redis.call('GET',KEYS[1]); if value then redis.call('DEL',KEYS[1]) end; return value`, []string{key}).Text()
-		if err != nil || Unmarshal([]byte(data), &state) != nil {
+		data, err := RDB.Get(context.Background(), key).Bytes()
+		if err != nil || Unmarshal(data, &state) != nil {
 			return state, false
 		}
-		return state, time.Now().Before(state.ExpiresAt)
+		if !time.Now().Before(state.ExpiresAt) {
+			RDB.Del(context.Background(), key)
+			return state, false
+		}
+		if state.VerifiedUses > 1 {
+			state.VerifiedUses--
+			updated, err := Marshal(state)
+			if err != nil || RDB.Set(context.Background(), key, updated, registrationCaptchaTTL).Err() != nil {
+				return state, false
+			}
+		} else {
+			RDB.Del(context.Background(), key)
+		}
+		return state, true
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	state, ok := store.values[id]
-	delete(store.values, id)
-	return state, ok && time.Now().Before(state.ExpiresAt)
+	if !ok || !time.Now().Before(state.ExpiresAt) {
+		delete(store.values, id)
+		return state, false
+	}
+	if state.VerifiedUses > 1 {
+		state.VerifiedUses--
+		store.values[id] = state
+	} else {
+		delete(store.values, id)
+	}
+	return state, true
 }
 
 func validateBehaviorCaptcha(state behaviorCaptchaState, typ string, payload BehaviorCaptchaPayload) bool {

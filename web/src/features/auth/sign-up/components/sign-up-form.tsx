@@ -293,7 +293,7 @@ export function SignUpForm({
           }
         : undefined
     const sent = await sendCode(emailValue || '', captcha)
-    if (registrationCaptchaEnabled) {
+    if (registrationCaptchaEnabled && !sent) {
       await loadCaptcha()
     }
     if (sent) {
