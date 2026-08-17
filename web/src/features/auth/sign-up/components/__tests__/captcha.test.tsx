@@ -222,7 +222,7 @@ describe('SignUpForm behavior captcha', () => {
         captcha_payload: { click_points: [{ x: 10, y: 10 }] },
       })
       expect(mocks.sendCode).toHaveBeenCalledOnce()
-      expect(mocks.getRegistrationCaptcha).toHaveBeenCalledTimes(2)
+      expect(mocks.getRegistrationCaptcha).toHaveBeenCalledTimes(3)
     })
     expect(
       screen.getByRole('button', { name: 'Create account' })

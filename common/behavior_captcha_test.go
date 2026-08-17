@@ -34,15 +34,13 @@ func TestVerifiedEmailCaptchaCanOnlyBeConsumedOnce(t *testing.T) {
 	id := "email-captcha"
 	behaviorStore.mu.Lock()
 	behaviorStore.values[id] = behaviorCaptchaState{
-		Type:         CaptchaTypeSlide,
-		VerifiedUses: 2,
-		SlidePoint:   BehaviorCaptchaPoint{X: 50, Y: 10},
-		ExpiresAt:    time.Now().Add(time.Minute),
+		Type:       CaptchaTypeSlide,
+		SlidePoint: BehaviorCaptchaPoint{X: 50, Y: 10},
+		ExpiresAt:  time.Now().Add(time.Minute),
 	}
 	behaviorStore.mu.Unlock()
 
 	assert.True(t, VerifyBehaviorCaptchaForEmail(id, CaptchaTypeSlide, BehaviorCaptchaPayload{X: 50, Y: 10}))
-	assert.True(t, ConsumeVerifiedBehaviorCaptcha(id, CaptchaTypeSlide))
 	assert.True(t, ConsumeVerifiedBehaviorCaptcha(id, CaptchaTypeSlide))
 	assert.False(t, ConsumeVerifiedBehaviorCaptcha(id, CaptchaTypeSlide))
 }
