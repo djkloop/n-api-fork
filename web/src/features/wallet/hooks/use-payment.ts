@@ -73,7 +73,13 @@ export async function requestPaymentAmount(
 
   const response = await calculator({ amount: topupAmount })
   if (!isApiSuccess(response) || !response.data) {
-    return 0
+    const detail = response.data?.trim()
+    const message =
+      detail ||
+      (response.message && response.message !== 'error'
+        ? response.message
+        : 'Failed to calculate payment amount')
+    throw new Error(message)
   }
 
   return Number.parseFloat(response.data)
@@ -95,9 +101,14 @@ export function usePayment() {
         )
         setAmount(calculatedAmount)
         return calculatedAmount
-      } catch {
+      } catch (error) {
         setAmount(0)
-        return 0
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Failed to calculate payment amount'
+        toast.error(i18next.t(message))
+        return null
       } finally {
         setCalculating(false)
       }

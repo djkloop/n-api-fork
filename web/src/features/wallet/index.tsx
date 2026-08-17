@@ -183,8 +183,13 @@ export function Wallet(props: WalletProps) {
       }
 
       // Calculate payment amount and show confirmation dialog
-      await calculatePaymentAmount(topupAmount, method.type)
-      setConfirmDialogOpen(true)
+      const calculatedAmount = await calculatePaymentAmount(
+        topupAmount,
+        method.type
+      )
+      if (calculatedAmount !== null) {
+        setConfirmDialogOpen(true)
+      }
     } finally {
       setPaymentLoading(null)
     }
@@ -263,8 +268,13 @@ export function Wallet(props: WalletProps) {
     setPaymentLoading(loadingKey)
 
     try {
-      await calculatePaymentAmount(topupAmount, PAYMENT_TYPES.WAFFO)
-      setConfirmDialogOpen(true)
+      const calculatedAmount = await calculatePaymentAmount(
+        topupAmount,
+        PAYMENT_TYPES.WAFFO
+      )
+      if (calculatedAmount !== null) {
+        setConfirmDialogOpen(true)
+      }
     } finally {
       setPaymentLoading(null)
     }

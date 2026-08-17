@@ -271,6 +271,53 @@ for (const [locale, additions] of Object.entries(ssrfLinkValues)) {
   Object.assign(values[locale], additions)
 }
 
+const paymentAmountErrorValues = {
+  en: {
+    'Failed to calculate payment amount':
+      'Failed to calculate payment amount',
+    'top-up quota limit exceeded':
+      'Your balance plus this top-up exceeds the account limit',
+  },
+  zh: {
+    'Failed to calculate payment amount': '计算支付金额失败',
+    'top-up quota limit exceeded':
+      '当前余额加上本次充值额度超过账户上限',
+  },
+  'zh-TW': {
+    'Failed to calculate payment amount': '計算付款金額失敗',
+    'top-up quota limit exceeded':
+      '目前餘額加上本次儲值額度超過帳戶上限',
+  },
+  fr: {
+    'Failed to calculate payment amount':
+      'Échec du calcul du montant à payer',
+    'top-up quota limit exceeded':
+      'Votre solde ajouté à cette recharge dépasse la limite du compte',
+  },
+  ja: {
+    'Failed to calculate payment amount':
+      '支払い金額を計算できませんでした',
+    'top-up quota limit exceeded':
+      '現在の残高と今回のチャージ額の合計がアカウント上限を超えています',
+  },
+  ru: {
+    'Failed to calculate payment amount':
+      'Не удалось рассчитать сумму платежа',
+    'top-up quota limit exceeded':
+      'Баланс с учетом этого пополнения превышает лимит аккаунта',
+  },
+  vi: {
+    'Failed to calculate payment amount':
+      'Không thể tính số tiền thanh toán',
+    'top-up quota limit exceeded':
+      'Số dư cộng với khoản nạp này vượt quá giới hạn tài khoản',
+  },
+}
+
+for (const [locale, additions] of Object.entries(paymentAmountErrorValues)) {
+  Object.assign(values[locale], additions)
+}
+
 for (const [locale, additions] of Object.entries(values)) {
   const file = path.join(dir, `${locale}.json`)
   const json = JSON.parse(await fs.readFile(file, 'utf8'))

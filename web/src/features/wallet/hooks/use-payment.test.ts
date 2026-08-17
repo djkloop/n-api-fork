@@ -22,6 +22,20 @@ import { PAYMENT_TYPES } from '../constants'
 import { requestPaymentAmount } from './use-payment'
 
 describe('payment amount routing', () => {
+  test('surfaces the backend detail when amount calculation fails', async () => {
+    const request = requestPaymentAmount(4294, PAYMENT_TYPES.ALIPAY, {
+      regular: async () => ({
+        message: 'error',
+        data: 'top-up quota limit exceeded',
+      }),
+      stripe: async () => ({ success: true, data: '2' }),
+      waffo: async () => ({ success: true, data: '3' }),
+      waffoPancake: async () => ({ success: true, data: '4' }),
+    })
+
+    await expect(request).rejects.toThrow('top-up quota limit exceeded')
+  })
+
   test('uses the dedicated Waffo amount calculator', async () => {
     const calls: string[] = []
     const amount = await requestPaymentAmount(120, PAYMENT_TYPES.WAFFO, {
