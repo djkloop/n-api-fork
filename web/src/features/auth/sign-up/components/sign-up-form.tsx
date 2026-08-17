@@ -146,10 +146,10 @@ export function SignUpForm({
   const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
   const captchaReady =
     !registrationCaptchaEnabled ||
+    emailVerificationRequired ||
     (Boolean(captchaId) &&
       Boolean(captchaImage) &&
-      Boolean(captchaPayload) &&
-      (!emailVerificationRequired || captchaVerified))
+      Boolean(captchaPayload))
 
   const loadCaptcha = useCallback(async () => {
     if (!registrationCaptchaEnabled) return

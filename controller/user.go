@@ -225,7 +225,7 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if common.RegistrationCaptchaEnabled {
+	if common.RegistrationCaptchaEnabled && !common.EmailVerificationEnabled {
 		verified := common.ConsumeVerifiedBehaviorCaptcha(req.CaptchaId, req.CaptchaType)
 		if !verified && !common.VerifyBehaviorCaptcha(req.CaptchaId, req.CaptchaType, req.CaptchaPayload) {
 			common.ApiErrorI18n(c, i18n.MsgUserCaptchaError)

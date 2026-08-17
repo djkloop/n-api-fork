@@ -229,6 +229,38 @@ describe('SignUpForm behavior captcha', () => {
     ).toBeDisabled()
   })
 
+  test('allows registration after email captcha was verified without solving the refreshed challenge', async () => {
+    mocks.status.email_verification = true
+
+    render(<SignUpForm />)
+    await fillRegistrationForm()
+    await userEvent.type(
+      screen.getByPlaceholderText('name@example.com'),
+      'alice@example.com'
+    )
+    await userEvent.type(
+      screen.getByPlaceholderText('Verification code'),
+      '123456'
+    )
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Confirm captcha' })
+    )
+    await screen.findByText('Captcha verified successfully')
+
+    const createButton = screen.getByRole('button', { name: 'Create account' })
+    expect(createButton).toBeEnabled()
+    await userEvent.click(createButton)
+
+    await waitFor(() => {
+      expect(mocks.register).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'alice@example.com',
+          verification_code: '123456',
+        })
+      )
+    })
+  })
+
   test('does not send an email code when captcha verification fails', async () => {
     mocks.status.email_verification = true
     mocks.verifyRegistrationCaptcha.mockResolvedValue({
