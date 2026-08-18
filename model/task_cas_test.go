@@ -59,6 +59,7 @@ func TestMain(m *testing.M) {
 		&SystemTaskLock{},
 		&IPBan{},
 		&RegistrationIPEvent{},
+		&RegistrationGuardLock{},
 		&RegistrationProtectionSetting{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
@@ -88,6 +89,7 @@ func truncateTables(t *testing.T) {
 		DB.Exec("DELETE FROM subscription_orders")
 		DB.Exec("DELETE FROM subscription_plans")
 		DB.Exec("DELETE FROM user_subscriptions")
+		DB.Exec("DELETE FROM registration_guard_locks")
 		DB.Exec("DELETE FROM perf_metrics")
 		DB.Exec("DELETE FROM system_instances")
 		DB.Exec("DELETE FROM system_task_locks")

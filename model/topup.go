@@ -575,7 +575,18 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 
 			// 如果用户邮箱为空，则更新为支付时使用的邮箱
 			if user.Email == "" {
-				updateFields["email"] = customerEmail
+				customerEmail = NormalizeEmail(customerEmail)
+				canonicalEmail, canonicalErr := CanonicalizeEmail(customerEmail)
+				if canonicalErr == nil {
+					claimErr := claimCanonicalEmailWithTx(tx, user.Id, customerEmail)
+					if claimErr != nil && !errors.Is(claimErr, ErrEmailAlreadyTaken) {
+						return claimErr
+					}
+					if claimErr == nil {
+						updateFields["email"] = customerEmail
+						updateFields["email_canonical"] = canonicalEmail
+					}
+				}
 			}
 		}
 

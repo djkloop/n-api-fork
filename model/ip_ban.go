@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -35,8 +36,11 @@ type IPBan struct {
 type RegistrationIPEvent struct {
 	Id        int    `json:"id"`
 	IP        string `json:"ip" gorm:"type:varchar(45);index:idx_registration_ip_created,priority:1"`
+	Network   string `json:"network" gorm:"type:varchar(64);index:idx_registration_network_created,priority:1"`
+	ASN       uint32 `json:"asn" gorm:"type:bigint;index:idx_registration_asn_created,priority:1"`
 	UserID    int    `json:"user_id"`
-	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_registration_ip_created,priority:2"`
+	Source    string `json:"source" gorm:"type:varchar(20)"`
+	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_registration_ip_created,priority:2;index:idx_registration_network_created,priority:2;index:idx_registration_asn_created,priority:2"`
 }
 
 func normalizeIP(ip string) (string, error) {
@@ -45,6 +49,79 @@ func normalizeIP(ip string) (string, error) {
 		return "", errors.New("invalid IP address")
 	}
 	return parsed.String(), nil
+}
+
+func registrationIdentity(ip string) (normalized string, network string, asn uint32, err error) {
+	normalized, err = normalizeIP(ip)
+	if err != nil {
+		return "", "", 0, err
+	}
+	address, err := netip.ParseAddr(normalized)
+	if err != nil {
+		return "", "", 0, err
+	}
+	address = address.Unmap()
+	prefixBits := 48
+	if address.Is4() {
+		prefixBits = 24
+	}
+	network = netip.PrefixFrom(address, prefixBits).Masked().String()
+	asn, _ = common.LookupASN(normalized)
+	return normalized, network, asn, nil
+}
+
+// IsRegistrationBlocked checks every locally available registration identity:
+// exact IP, IPv4 /24 or IPv6 /48 network, and optional ASN data.
+func IsRegistrationBlocked(ip string) (bool, error) {
+	banned, err := IsIPBanned(ip)
+	if err != nil || banned {
+		return banned, err
+	}
+	setting, err := GetRegistrationProtectionSetting()
+	if err != nil {
+		return false, err
+	}
+	if setting.Enabled != RegistrationProtectionEnabled {
+		return false, nil
+	}
+	normalized, network, asn, err := registrationIdentity(ip)
+	if err != nil {
+		return false, err
+	}
+	if registrationASNBlocked(setting.BlockedASNs, asn) {
+		return true, nil
+	}
+	since := common.GetTimestamp() - int64(setting.WindowHours)*3600
+	checks := []struct {
+		column    string
+		value     interface{}
+		threshold int
+	}{
+		{column: "ip", value: normalized, threshold: setting.Threshold},
+		{column: "network", value: network, threshold: setting.SubnetThreshold},
+	}
+	if asn != 0 {
+		checks = append(checks, struct {
+			column    string
+			value     interface{}
+			threshold int
+		}{column: "asn", value: asn, threshold: setting.ASNThreshold})
+	}
+	for _, check := range checks {
+		if check.threshold <= 0 {
+			continue
+		}
+		var count int64
+		if err := DB.Model(&RegistrationIPEvent{}).
+			Where(check.column+" = ? AND created_at >= ?", check.value, since).
+			Count(&count).Error; err != nil {
+			return false, err
+		}
+		if count >= int64(check.threshold) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func IsIPBanned(ip string) (bool, error) {
@@ -99,6 +176,10 @@ func ListIPBans(startIdx, limit int, keyword string) ([]*IPBan, int64, error) {
 }
 
 func UpsertIPBan(ip, reason, source string, expiresAt int64, blockOutbound bool) (*IPBan, error) {
+	return upsertIPBanWithTx(DB, ip, reason, source, expiresAt, blockOutbound)
+}
+
+func upsertIPBanWithTx(tx *gorm.DB, ip, reason, source string, expiresAt int64, blockOutbound bool) (*IPBan, error) {
 	normalized, err := normalizeIP(ip)
 	if err != nil {
 		return nil, err
@@ -108,10 +189,10 @@ func UpsertIPBan(ip, reason, source string, expiresAt int64, blockOutbound bool)
 	}
 	now := time.Now().Unix()
 	var ban IPBan
-	err = DB.Where("ip = ?", normalized).First(&ban).Error
+	err = tx.Where("ip = ?", normalized).First(&ban).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		ban = IPBan{IP: normalized, Reason: strings.TrimSpace(reason), Source: source, Status: IPBanStatusActive, ExpiresAt: expiresAt, BlockOutbound: blockOutbound, CreatedAt: now, UpdatedAt: now}
-		return &ban, DB.Create(&ban).Error
+		return &ban, tx.Create(&ban).Error
 	}
 	if err != nil {
 		return nil, err
@@ -124,7 +205,7 @@ func UpsertIPBan(ip, reason, source string, expiresAt int64, blockOutbound bool)
 	ban.ReleasedAt = 0
 	ban.ReleasedBy = 0
 	ban.UpdatedAt = now
-	return &ban, DB.Save(&ban).Error
+	return &ban, tx.Save(&ban).Error
 }
 
 func ReleaseIPBan(id, releasedBy int) error {
@@ -141,7 +222,11 @@ func ReleaseIPBan(id, releasedBy int) error {
 }
 
 func RecordRegistrationIP(ip string, userID int) (bool, error) {
-	normalized, err := normalizeIP(ip)
+	return RecordRegistration(ip, userID, "password")
+}
+
+func RecordRegistration(ip string, userID int, source string) (bool, error) {
+	normalized, network, asn, err := registrationIdentity(ip)
 	if err != nil {
 		return false, err
 	}
@@ -155,7 +240,13 @@ func RecordRegistrationIP(ip string, userID int) (bool, error) {
 	}
 	windowSeconds := int64(setting.WindowHours) * 3600
 	threshold := setting.Threshold
-	if err := DB.Create(&RegistrationIPEvent{IP: normalized, UserID: userID, CreatedAt: now}).Error; err != nil {
+	source = strings.TrimSpace(source)
+	if len(source) > 20 {
+		source = source[:20]
+	}
+	if err := DB.Create(&RegistrationIPEvent{
+		IP: normalized, Network: network, ASN: asn, UserID: userID, Source: source, CreatedAt: now,
+	}).Error; err != nil {
 		return false, err
 	}
 	DB.Where("created_at < ?", now-windowSeconds).Delete(&RegistrationIPEvent{})

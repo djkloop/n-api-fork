@@ -85,6 +85,7 @@ type User struct {
 	Role             int                        `json:"role" gorm:"type:int;default:1"`   // admin, common
 	Status           int                        `json:"status" gorm:"type:int;default:1"` // enabled, disabled
 	Email            string                     `json:"email" gorm:"index" validate:"max=50"`
+	EmailCanonical   string                     `json:"-" gorm:"type:varchar(128);column:email_canonical;index"`
 	GitHubId         string                     `json:"github_id" gorm:"column:github_id;index"`
 	DiscordId        string                     `json:"discord_id" gorm:"column:discord_id;index"`
 	OidcId           string                     `json:"oidc_id" gorm:"column:oidc_id;index"`
@@ -305,11 +306,19 @@ func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-func emailQuery(tx *gorm.DB, email string) *gorm.DB {
+func emailQuery(tx *gorm.DB, email string) (*gorm.DB, error) {
 	if tx == nil {
 		tx = DB
 	}
-	return tx.Unscoped().Model(&User{}).Where("LOWER(email) = ?", NormalizeEmail(email))
+	canonicalEmail, err := CanonicalizeEmail(email)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Unscoped().Model(&User{}).Where(
+		"email_canonical = ? OR (email_canonical = '' AND LOWER(email) = ?)",
+		canonicalEmail,
+		NormalizeEmail(email),
+	), nil
 }
 
 func CountUsersByEmail(email string) (int64, error) {
@@ -317,8 +326,12 @@ func CountUsersByEmail(email string) (int64, error) {
 	if email == "" {
 		return 0, nil
 	}
+	query, err := emailQuery(DB, email)
+	if err != nil {
+		return 0, err
+	}
 	var count int64
-	err := emailQuery(DB, email).Count(&count).Error
+	err = query.Count(&count).Error
 	return count, err
 }
 
@@ -327,7 +340,10 @@ func IsEmailAvailable(email string, excludeUserID int) (bool, error) {
 	if email == "" {
 		return true, nil
 	}
-	query := emailQuery(DB, email)
+	query, err := emailQuery(DB, email)
+	if err != nil {
+		return false, err
+	}
 	if excludeUserID > 0 {
 		query = query.Where("id <> ?", excludeUserID)
 	}
@@ -349,31 +365,34 @@ func EnsureEmailAvailable(email string, excludeUserID int) error {
 	return nil
 }
 
-// withNormalizedEmailLock serializes concurrent writers that target the same
-// normalized email inside tx, so a "check then write" sequence cannot be raced
+// withEmailIdentityLock serializes concurrent writers that target the same
+// canonical email identity inside tx, so a "check then write" sequence cannot be raced
 // by two transactions. It must be called inside an active transaction; the lock
 // is scoped to that transaction and released on commit/rollback.
 //
-//   - PostgreSQL: transaction-level advisory lock keyed by the normalized email.
+//   - PostgreSQL: transaction-level advisory lock keyed by the canonical email.
 //   - MySQL (default REPEATABLE READ): a locking read that takes a next-key/gap
-//     lock on the email index, blocking concurrent inserts of the same value.
+//     lock on the canonical email index, blocking concurrent inserts of the same value.
 //   - SQLite: no explicit lock; the single-writer model already serializes the
 //     write, so a racing second write fails instead of duplicating.
 //
 // An empty email is allowed to repeat and needs no serialization.
-func withNormalizedEmailLock(tx *gorm.DB, email string, fn func(tx *gorm.DB) error) error {
-	email = NormalizeEmail(email)
-	if email == "" {
+func withEmailIdentityLock(tx *gorm.DB, email string, fn func(tx *gorm.DB) error) error {
+	canonicalEmail, err := CanonicalizeEmail(email)
+	if err != nil {
+		return err
+	}
+	if canonicalEmail == "" {
 		return fn(tx)
 	}
 	switch {
 	case common.UsingMainDatabase(common.DatabaseTypePostgreSQL):
-		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", email).Error; err != nil {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", canonicalEmail).Error; err != nil {
 			return err
 		}
 	case common.UsingMainDatabase(common.DatabaseTypeMySQL):
 		var ids []int
-		if err := tx.Raw("SELECT id FROM users WHERE email = ? FOR UPDATE", email).Scan(&ids).Error; err != nil {
+		if err := tx.Raw("SELECT id FROM users WHERE email_canonical = ? FOR UPDATE", canonicalEmail).Scan(&ids).Error; err != nil {
 			return err
 		}
 	}
@@ -583,13 +602,17 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 
 func (user *User) prepareForInsert(tx *gorm.DB) error {
 	user.Email = NormalizeEmail(user.Email)
+	canonicalEmail, err := CanonicalizeEmail(user.Email)
+	if err != nil {
+		return err
+	}
+	user.EmailCanonical = canonicalEmail
 	if err := ensureEmailAvailableWithTx(tx, user.Email, 0); err != nil {
 		return err
 	}
 	if user.Password == "" {
 		return nil
 	}
-	var err error
 	user.Password, err = common.Password2Hash(user.Password)
 	return err
 }
@@ -600,11 +623,19 @@ func (user *User) prepareForInsert(tx *gorm.DB) error {
 func BindEmailToUser(user *User, email string) error {
 	email = NormalizeEmail(email)
 	if err := DB.Transaction(func(tx *gorm.DB) error {
-		return withNormalizedEmailLock(tx, email, func(tx *gorm.DB) error {
+		return withEmailIdentityLock(tx, email, func(tx *gorm.DB) error {
 			if err := ensureEmailAvailableWithTx(tx, email, user.Id); err != nil {
 				return err
 			}
+			canonicalEmail, err := CanonicalizeEmail(email)
+			if err != nil {
+				return err
+			}
 			user.Email = email
+			user.EmailCanonical = canonicalEmail
+			if err := replaceCanonicalEmailClaimWithTx(tx, user.Id, email); err != nil {
+				return err
+			}
 			return user.UpdateWithTx(tx, false)
 		})
 	}); err != nil {
@@ -618,7 +649,10 @@ func ensureEmailAvailableWithTx(tx *gorm.DB, email string, excludeUserID int) er
 	if email == "" {
 		return nil
 	}
-	query := emailQuery(tx, email)
+	query, err := emailQuery(tx, email)
+	if err != nil {
+		return err
+	}
 	if excludeUserID > 0 {
 		query = query.Where("id <> ?", excludeUserID)
 	}
@@ -634,7 +668,7 @@ func ensureEmailAvailableWithTx(tx *gorm.DB, email string, excludeUserID int) er
 
 func (user *User) Insert(inviterId int) error {
 	if err := DB.Transaction(func(tx *gorm.DB) error {
-		return withNormalizedEmailLock(tx, user.Email, func(tx *gorm.DB) error {
+		return withEmailIdentityLock(tx, user.Email, func(tx *gorm.DB) error {
 			if err := user.prepareForInsert(tx); err != nil {
 				return err
 			}
@@ -648,7 +682,10 @@ func (user *User) Insert(inviterId int) error {
 				user.SetSetting(defaultSetting)
 			}
 
-			return tx.Create(user).Error
+			if err := tx.Create(user).Error; err != nil {
+				return err
+			}
+			return claimCanonicalEmailWithTx(tx, user.Id, user.Email)
 		})
 	}); err != nil {
 		return err
@@ -698,7 +735,7 @@ func (user *User) FinishInsert(inviterId int) {
 // This is used for OAuth registration where user creation and binding need to be atomic.
 // Post-creation tasks (sidebar config, logs, inviter rewards) are handled after the transaction commits.
 func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
-	return withNormalizedEmailLock(tx, user.Email, func(tx *gorm.DB) error {
+	return withEmailIdentityLock(tx, user.Email, func(tx *gorm.DB) error {
 		if err := user.prepareForInsert(tx); err != nil {
 			return err
 		}
@@ -711,7 +748,10 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 			user.SetSetting(defaultSetting)
 		}
 
-		return tx.Create(user).Error
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		return claimCanonicalEmailWithTx(tx, user.Id, user.Email)
 	})
 }
 
@@ -775,9 +815,24 @@ func (user *User) UpdateWithTx(tx *gorm.DB, updatePassword bool) error {
 		}
 	}
 	newUser := *user
+	if newUser.Email != "" {
+		newUser.Email = NormalizeEmail(newUser.Email)
+		newUser.EmailCanonical, err = CanonicalizeEmail(newUser.Email)
+		if err != nil {
+			return err
+		}
+	}
 	current := User{}
 	if err = tx.First(&current, user.Id).Error; err != nil {
 		return err
+	}
+	if newUser.Email != "" && newUser.EmailCanonical != current.EmailCanonical {
+		if err := ensureEmailAvailableWithTx(tx, newUser.Email, user.Id); err != nil {
+			return err
+		}
+		if err := replaceCanonicalEmailClaimWithTx(tx, user.Id, newUser.Email); err != nil {
+			return err
+		}
 	}
 	// Updates(struct) ignores zero values. Match that behavior when deciding
 	// whether this request actually changes authentication-sensitive state;
@@ -885,11 +940,18 @@ func (user *User) ClearBinding(bindingType string) error {
 	}
 
 	if err := DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&User{}).Where("id = ?", user.Id).Update(column, "").Error; err != nil {
+		updates := map[string]interface{}{column: ""}
+		if bindingType == "email" {
+			updates["email_canonical"] = ""
+		}
+		if err := tx.Model(&User{}).Where("id = ?", user.Id).Updates(updates).Error; err != nil {
 			return err
 		}
 		if bindingType == ExternalIdentityProviderTelegram {
 			return ReleaseExternalIdentityWithTx(tx, ExternalIdentityProviderTelegram, user.Id)
+		}
+		if bindingType == "email" {
+			return ReleaseExternalIdentityWithTx(tx, ExternalIdentityProviderEmailCanonical, user.Id)
 		}
 		return nil
 	}); err != nil {

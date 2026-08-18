@@ -9,7 +9,11 @@ import (
 
 func RegistrationIPBan() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		banned, err := model.IsIPBanned(c.ClientIP())
+		if c.GetInt("id") > 0 {
+			c.Next()
+			return
+		}
+		banned, err := model.IsRegistrationBlocked(c.ClientIP())
 		if err != nil {
 			common.ApiError(c, err)
 			c.Abort()

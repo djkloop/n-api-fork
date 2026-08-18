@@ -292,11 +292,15 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&IPBan{},
 		&RegistrationIPEvent{},
+		&RegistrationGuardLock{},
 		&RegistrationProtectionSetting{},
 		&CasbinRule{},
 		&AuthzRole{},
 	)
 	if err != nil {
+		return err
+	}
+	if err := InitializeUserEmailCanonicals(); err != nil {
 		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
@@ -358,6 +362,7 @@ func migrateDBFast() error {
 		{&SystemTaskLock{}, "SystemTaskLock"},
 		{&IPBan{}, "IPBan"},
 		{&RegistrationIPEvent{}, "RegistrationIPEvent"},
+		{&RegistrationGuardLock{}, "RegistrationGuardLock"},
 		{&RegistrationProtectionSetting{}, "RegistrationProtectionSetting"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
@@ -382,6 +387,9 @@ func migrateDBFast() error {
 		if err != nil {
 			return err
 		}
+	}
+	if err := InitializeUserEmailCanonicals(); err != nil {
+		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
 		return err

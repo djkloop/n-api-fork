@@ -20,9 +20,14 @@ export type RegistrationProtectionSetting = {
   id: number
   enabled: number
   threshold: number
+  subnet_threshold: number
+  asn_threshold: number
+  blocked_asns: string
   window_hours: number
   duration_hours: number
   updated_at: number
+  asn_database_available: boolean
+  asn_database_error?: string
 }
 
 export type RegistrationProtectionResponse = {

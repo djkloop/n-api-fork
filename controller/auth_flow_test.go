@@ -24,6 +24,7 @@ type authFlowTestOAuthProvider struct {
 	userInfoErr   error
 	exchangeCalls int
 	userInfoCalls int
+	existingUser  *model.User
 }
 
 func (*authFlowTestOAuthProvider) GetName() string { return "Auth Flow Test" }
@@ -42,11 +43,18 @@ func (provider *authFlowTestOAuthProvider) GetUserInfo(context.Context, *oauth.O
 	}
 	return &oauth.OAuthUser{ProviderUserID: "external-user"}, nil
 }
-func (*authFlowTestOAuthProvider) IsUserIDTaken(string) bool                      { return false }
-func (*authFlowTestOAuthProvider) FillUserByProviderID(*model.User, string) error { return nil }
-func (*authFlowTestOAuthProvider) SetProviderUserID(*model.User, string)          {}
-func (*authFlowTestOAuthProvider) GetProviderPrefix() string                      { return "flow_" }
-func (*authFlowTestOAuthProvider) ProviderUserIDColumn() string                   { return "" }
+func (provider *authFlowTestOAuthProvider) IsUserIDTaken(string) bool {
+	return provider.existingUser != nil
+}
+func (provider *authFlowTestOAuthProvider) FillUserByProviderID(user *model.User, _ string) error {
+	if provider.existingUser != nil {
+		*user = *provider.existingUser
+	}
+	return nil
+}
+func (*authFlowTestOAuthProvider) SetProviderUserID(*model.User, string) {}
+func (*authFlowTestOAuthProvider) GetProviderPrefix() string             { return "flow_" }
+func (*authFlowTestOAuthProvider) ProviderUserIDColumn() string          { return "" }
 
 func setupAuthFlowControllerTest(t *testing.T) *authFlowTestOAuthProvider {
 	t.Helper()
@@ -65,6 +73,25 @@ func setupAuthFlowControllerTest(t *testing.T) *authFlowTestOAuthProvider {
 		common.SetMainDatabaseType(previousType)
 	})
 	return provider
+}
+
+func TestFindOrCreateOAuthUserDoesNotApplyRegistrationGuardToExistingIdentity(t *testing.T) {
+	provider := &authFlowTestOAuthProvider{
+		existingUser: &model.User{Id: 42, Username: "existing-oauth", Status: common.UserStatusEnabled},
+	}
+	previousRegisterEnabled := common.RegisterEnabled
+	common.RegisterEnabled = false
+	t.Cleanup(func() { common.RegisterEnabled = previousRegisterEnabled })
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/oauth/auth-flow-test", nil)
+	c.Request.RemoteAddr = "not-a-registration-ip"
+
+	user, err := findOrCreateOAuthUser(c, provider, &oauth.OAuthUser{ProviderUserID: "external-user"}, "")
+	require.NoError(t, err)
+	assert.Equal(t, 42, user.Id)
+	assert.Equal(t, "existing-oauth", user.Username)
 }
 
 func TestGenerateOAuthCodeCarriesAffiliateInLoginFlow(t *testing.T) {

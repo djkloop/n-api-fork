@@ -297,7 +297,6 @@ func SendEmailVerification(c *gin.Context) {
 		})
 		return
 	}
-	localPart := parts[0]
 	domainPart := parts[1]
 	if common.EmailDomainRestrictionEnabled {
 		allowed := false
@@ -316,11 +315,11 @@ func SendEmailVerification(c *gin.Context) {
 		}
 	}
 	if common.EmailAliasRestrictionEnabled {
-		containsSpecialSymbols := strings.Contains(localPart, "+") || strings.Contains(localPart, ".")
-		if containsSpecialSymbols {
+		canonicalEmail, err := model.CanonicalizeEmail(email)
+		if err != nil || canonicalEmail != email {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "管理员已启用邮箱地址别名限制，您的邮箱地址由于包含特殊符号而被拒绝。",
+				"message": "管理员已启用邮箱地址别名限制，该邮箱别名不可用于注册。",
 			})
 			return
 		}

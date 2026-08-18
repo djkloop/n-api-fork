@@ -88,6 +88,29 @@ func getUserQuotaForPaymentGuardTest(t *testing.T, userID int) int {
 	return user.Quota
 }
 
+func TestRechargeCreemCreditsQuotaWhenPaymentEmailIsAlreadyClaimed(t *testing.T) {
+	truncateTables(t)
+
+	owner := User{
+		Username: "payment-email-owner",
+		Password: "password123",
+		Email:    "shared@outlook.com",
+		Role:     common.RoleCommonUser,
+	}
+	require.NoError(t, owner.Insert(0))
+	buyer := insertUserForPaymentGuardTest(t, 102, 0)
+	insertTopUpForPaymentGuardTest(t, "creem-email-conflict", buyer.Id, PaymentProviderCreem)
+
+	err := RechargeCreem("creem-email-conflict", "shared+receipt@outlook.com", "Buyer", "127.0.0.1")
+	require.NoError(t, err)
+	assert.Equal(t, 2, getUserQuotaForPaymentGuardTest(t, buyer.Id))
+
+	storedBuyer, err := GetUserById(buyer.Id, true)
+	require.NoError(t, err)
+	assert.Empty(t, storedBuyer.Email)
+	assert.Equal(t, common.TopUpStatusSuccess, getTopUpStatusForPaymentGuardTest(t, "creem-email-conflict"))
+}
+
 func TestRechargeWaffoPancake_RejectsMismatchedPaymentMethod(t *testing.T) {
 	truncateTables(t)
 

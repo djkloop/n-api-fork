@@ -35,6 +35,7 @@ type LoginRequest struct {
 var (
 	errUserPasswordUnset    = errors.New("user password is not set")
 	errOriginalPasswordFail = errors.New("original password is incorrect")
+	errCreateDefaultToken   = errors.New("create default token failed")
 )
 
 func Login(c *gin.Context) {
@@ -211,7 +212,7 @@ type RegisterRequest struct {
 }
 
 func Register(c *gin.Context) {
-	if banned, err := model.IsIPBanned(c.ClientIP()); err != nil {
+	if banned, err := model.IsRegistrationBlocked(c.ClientIP()); err != nil {
 		common.ApiError(c, err)
 		return
 	} else if banned {
@@ -294,52 +295,57 @@ func Register(c *gin.Context) {
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
-	if err := cleanUser.Insert(inviterId); err != nil {
-		if errors.Is(err, model.ErrEmailAlreadyTaken) {
-			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
-			return
-		}
-		common.ApiError(c, err)
-		return
-	}
-
-	// 获取插入后的用户ID
-	var insertedUser model.User
-	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
-		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
-		return
-	}
-	// 生成默认令牌
+	var defaultTokenKey string
 	if constant.GenerateDefaultToken {
-		key, err := common.GenerateKey()
+		defaultTokenKey, err = common.GenerateKey()
 		if err != nil {
 			common.ApiErrorI18n(c, i18n.MsgUserDefaultTokenFailed)
 			common.SysLog("failed to generate token key: " + err.Error())
 			return
 		}
-		// 生成默认令牌
+	}
+	err = model.CreateRegisteredUser(c.ClientIP(), "password", func(tx *gorm.DB) (int, error) {
+		if err := cleanUser.InsertWithTx(tx, inviterId); err != nil {
+			return 0, err
+		}
+		if !constant.GenerateDefaultToken {
+			return cleanUser.Id, nil
+		}
 		token := model.Token{
-			UserId:             insertedUser.Id, // 使用插入后的用户ID
+			UserId:             cleanUser.Id,
 			Name:               cleanUser.Username + "的初始令牌",
-			Key:                key,
+			Key:                defaultTokenKey,
 			CreatedTime:        common.GetTimestamp(),
 			AccessedTime:       common.GetTimestamp(),
-			ExpiredTime:        -1,     // 永不过期
-			RemainQuota:        500000, // 示例额度
+			ExpiredTime:        -1,
+			RemainQuota:        500000,
 			UnlimitedQuota:     true,
 			ModelLimitsEnabled: false,
 		}
 		if setting.DefaultUseAutoGroup {
 			token.Group = "auto"
 		}
-		if err := token.Insert(); err != nil {
-			common.ApiErrorI18n(c, i18n.MsgCreateDefaultTokenErr)
-			return
+		if err := tx.Create(&token).Error; err != nil {
+			return 0, fmt.Errorf("%w: %v", errCreateDefaultToken, err)
 		}
+		return cleanUser.Id, nil
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, model.ErrRegistrationBlocked):
+			common.ApiErrorI18n(c, i18n.MsgUserRegistrationIPBlocked)
+		case errors.Is(err, model.ErrEmailAlreadyTaken):
+			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+		case errors.Is(err, errCreateDefaultToken):
+			common.ApiErrorI18n(c, i18n.MsgCreateDefaultTokenErr)
+		default:
+			common.ApiError(c, err)
+		}
+		return
 	}
-
-	if _, err := model.RecordRegistrationIP(c.ClientIP(), insertedUser.Id); err != nil {
-		common.SysError(fmt.Sprintf("failed to record registration IP %s: %v", c.ClientIP(), err))
+	cleanUser.FinishInsert(inviterId)
+	if common.EmailVerificationEnabled {
+		common.DeleteKey(user.Email, common.EmailVerificationPurpose)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

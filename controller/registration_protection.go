@@ -26,7 +26,9 @@ func UpdateRegistrationProtectionSetting(c *gin.Context) {
 		return
 	}
 	model.RecordOperationAuditLog(c.GetInt("id"), "Updated registration IP protection settings", c.ClientIP(), "registration_protection.update", map[string]interface{}{
-		"enabled": setting.Enabled, "threshold": setting.Threshold, "window_hours": setting.WindowHours, "duration_hours": setting.DurationHours,
+		"enabled": setting.Enabled, "threshold": setting.Threshold, "subnet_threshold": setting.SubnetThreshold,
+		"asn_threshold": setting.ASNThreshold, "blocked_asns": setting.BlockedASNs,
+		"window_hours": setting.WindowHours, "duration_hours": setting.DurationHours,
 	}, nil, nil)
 	common.ApiSuccess(c, setting)
 }

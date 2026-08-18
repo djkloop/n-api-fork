@@ -42,6 +42,9 @@ import { SettingsSection } from '../components/settings-section'
 const schema = z.object({
   enabled: z.number().int().min(0).max(1),
   threshold: z.number().int().min(1).max(10000),
+  subnet_threshold: z.number().int().min(0).max(1000000),
+  asn_threshold: z.number().int().min(0).max(1000000),
+  blocked_asns: z.string().max(4096),
   window_hours: z.number().int().min(1).max(8760),
   duration_hours: z.number().int().min(0).max(8760),
 })
@@ -51,6 +54,9 @@ type FormValues = z.infer<typeof schema>
 const defaultValues: FormValues = {
   enabled: 1,
   threshold: 5,
+  subnet_threshold: 20,
+  asn_threshold: 0,
+  blocked_asns: '',
   window_hours: 24,
   duration_hours: 24,
 }
@@ -101,11 +107,11 @@ export function RegistrationProtectionSection() {
         <SettingsSwitchItem>
           <SettingsSwitchContent>
             <div className='font-medium'>
-              {t('Enable automatic IP blocking')}
+              {t('Enable registration network protection')}
             </div>
             <p className='text-muted-foreground text-sm'>
               {t(
-                'Automatically block an IP after repeated successful registrations.'
+                'Detect rotating proxy registrations by IP, subnet, and optional local ASN data.'
               )}
             </p>
           </SettingsSwitchContent>
@@ -116,7 +122,7 @@ export function RegistrationProtectionSection() {
             }
           />
         </SettingsSwitchItem>
-        <div className='grid gap-4 sm:grid-cols-3'>
+        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
           <label className='grid gap-2 text-sm font-medium'>
             {t('Registration threshold')}
             <Input
@@ -127,6 +133,44 @@ export function RegistrationProtectionSection() {
             />
             <span className='text-muted-foreground text-xs font-normal'>
               {t('Successful registrations from one IP before blocking.')}
+            </span>
+          </label>
+          <label className='grid gap-2 text-sm font-medium'>
+            {t('Subnet threshold')}
+            <Input
+              type='number'
+              min={0}
+              max={1000000}
+              {...form.register('subnet_threshold', { valueAsNumber: true })}
+            />
+            <span className='text-muted-foreground text-xs font-normal'>
+              {t(
+                'Successful registrations from one IPv4 /24 or IPv6 /48 network. Set to 0 to disable.'
+              )}
+            </span>
+          </label>
+          <label className='grid gap-2 text-sm font-medium'>
+            {t('ASN threshold')}
+            <Input
+              type='number'
+              min={0}
+              max={1000000}
+              {...form.register('asn_threshold', { valueAsNumber: true })}
+            />
+            <span className='text-muted-foreground text-xs font-normal'>
+              {t(
+                'Successful registrations from one ASN. Set to 0 to disable; use carefully for carrier networks.'
+              )}
+            </span>
+          </label>
+          <label className='grid gap-2 text-sm font-medium sm:col-span-2 lg:col-span-3'>
+            {t('Blocked ASNs')}
+            <Input
+              placeholder='200373,26548'
+              {...form.register('blocked_asns')}
+            />
+            <span className='text-muted-foreground text-xs font-normal'>
+              {t('Comma-separated ASN numbers, for example: 200373,26548.')}
             </span>
           </label>
           <label className='grid gap-2 text-sm font-medium'>
@@ -151,6 +195,22 @@ export function RegistrationProtectionSection() {
             </span>
           </label>
         </div>
+        {query.data?.data && (
+          <div className='text-muted-foreground text-sm'>
+            <span className='text-foreground font-medium'>
+              {query.data.data.asn_database_available
+                ? t('Local ASN database available')
+                : t('Local ASN database unavailable')}
+            </span>
+            {!query.data.data.asn_database_available && (
+              <span className='ml-2'>
+                {t(
+                  'Set ASN_DB_PATH to a local GeoLite2-ASN MMDB file and restart the service.'
+                )}
+              </span>
+            )}
+          </div>
+        )}
       </SettingsForm>
     </SettingsSection>
   )

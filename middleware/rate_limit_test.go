@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -113,6 +114,36 @@ func TestRedisEmailVerificationRateLimiterPreservesResponseAndTTL(t *testing.T) 
 	key := redisIPRateLimitKey(EmailVerificationRateLimitMark, "192.0.2.30")
 	assert.True(t, redisServer.Exists(key))
 	assert.Equal(t, time.Duration(EmailVerificationDuration)*time.Second, redisServer.TTL(key))
+}
+
+func TestRedisEmailVerificationLimiterGroupsProviderAliasesAcrossIPs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	redisServer, _ := useRateLimitMiniRedis(t)
+
+	router := gin.New()
+	require.NoError(t, router.SetTrustedProxies(nil))
+	router.GET("/verify", EmailVerificationRateLimit(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	aliases := []string{
+		"mailbox%2Bone%40outlook.com",
+		"mailbox%2Btwo%40outlook.com",
+		"mailbox%2Bthree%40outlook.com",
+	}
+	for index, email := range aliases {
+		path := "/verify?email=" + email
+		remoteAddr := fmt.Sprintf("192.0.2.%d:12345", index+70)
+		assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, path, remoteAddr).Code)
+	}
+
+	response := performRateLimitRequest(router, "/verify?email=mailbox%2Bfour%40outlook.com", "192.0.2.80:12345")
+	assert.Equal(t, http.StatusTooManyRequests, response.Code)
+
+	mailboxKey, ok := emailVerificationMailboxKey("mailbox+alias@outlook.com")
+	require.True(t, ok)
+	assert.True(t, redisServer.Exists(mailboxKey))
+	assert.Equal(t, time.Duration(EmailVerificationMailboxDuration)*time.Second, redisServer.TTL(mailboxKey))
 }
 
 func TestRedisFixedWindowIsAtomicUnderConcurrency(t *testing.T) {

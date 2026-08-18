@@ -10,7 +10,10 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const ExternalIdentityProviderTelegram = "telegram"
+const (
+	ExternalIdentityProviderEmailCanonical = "email_canonical"
+	ExternalIdentityProviderTelegram       = "telegram"
+)
 
 var ErrExternalIdentityAlreadyClaimed = errors.New("external identity is already claimed")
 
@@ -83,10 +86,44 @@ func releaseAllExternalIdentitiesWithTx(tx *gorm.DB, userId int) error {
 	return tx.Where("user_id = ?", userId).Delete(&ExternalIdentityClaim{}).Error
 }
 
-// InitializeExternalIdentityClaims imports legacy Telegram bindings after the
-// claim table is migrated. Existing duplicate ownership fails migration rather
-// than preserving an ambiguous login identity.
+func initializeCanonicalEmailClaims() error {
+	const batchSize = 500
+	lastID := 0
+	for {
+		var users []User
+		if err := DB.Unscoped().Select("id", "email_canonical").
+			Where("id > ? AND email_canonical <> ?", lastID, "").
+			Order("id ASC").Limit(batchSize).Find(&users).Error; err != nil {
+			return err
+		}
+		if len(users) == 0 {
+			return nil
+		}
+		if err := DB.Transaction(func(tx *gorm.DB) error {
+			for _, user := range users {
+				if err := ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderEmailCanonical, user.EmailCanonical, user.Id); err != nil && !errors.Is(err, ErrExternalIdentityAlreadyClaimed) {
+					return fmt.Errorf("backfill canonical email identity for user %d: %w", user.Id, err)
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		lastID = users[len(users)-1].Id
+	}
+}
+
+// InitializeExternalIdentityClaims imports durable ownership for identities
+// stored on legacy user rows after the claim table is migrated. Canonical email
+// collisions are grandfathered deterministically to the lowest user ID; the
+// shared canonical value still blocks all future registrations. Telegram
+// duplicates remain a migration error because they make login ownership
+// ambiguous.
 func InitializeExternalIdentityClaims() error {
+	if err := initializeCanonicalEmailClaims(); err != nil {
+		return err
+	}
+
 	var users []User
 	if err := DB.Unscoped().Select("id", "telegram_id").
 		Where("telegram_id <> ?", "").Find(&users).Error; err != nil {

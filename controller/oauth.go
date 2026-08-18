@@ -195,6 +195,10 @@ func HandleOAuth(c *gin.Context) {
 	}
 	user, err := findOrCreateOAuthUser(c, provider, oauthUser, payload.AffiliateCode)
 	if err != nil {
+		if errors.Is(err, model.ErrRegistrationBlocked) {
+			common.ApiErrorI18n(c, i18n.MsgUserRegistrationIPBlocked)
+			return
+		}
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
 			return
@@ -369,24 +373,21 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 
 	// Use transaction to ensure user creation and OAuth binding are atomic
 	if genericProvider, ok := provider.(*oauth.GenericOAuthProvider); ok {
-		// Custom provider: create user and binding in a transaction
-		err := model.DB.Transaction(func(tx *gorm.DB) error {
-			// Create user
+		// Custom provider: create user, binding, and registration event atomically.
+		err := model.CreateRegisteredUser(c.ClientIP(), "oauth", func(tx *gorm.DB) (int, error) {
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
-				return err
+				return 0, err
 			}
 
-			// Create OAuth binding
 			binding := &model.UserOAuthBinding{
 				UserId:         user.Id,
 				ProviderId:     genericProvider.GetProviderId(),
 				ProviderUserId: oauthUser.ProviderUserID,
 			}
 			if err := model.CreateUserOAuthBindingWithTx(tx, binding); err != nil {
-				return err
+				return 0, err
 			}
-
-			return nil
+			return user.Id, nil
 		})
 		if err != nil {
 			return nil, err
@@ -395,14 +396,12 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		// Perform post-transaction tasks (logs, sidebar config, inviter rewards)
 		user.FinalizeOAuthUserCreation(inviterId)
 	} else {
-		// Built-in provider: create user and update provider ID in a transaction
-		err := model.DB.Transaction(func(tx *gorm.DB) error {
-			// Create user
+		// Built-in provider: create user, provider identity, and registration event atomically.
+		err := model.CreateRegisteredUser(c.ClientIP(), "oauth", func(tx *gorm.DB) (int, error) {
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
-				return err
+				return 0, err
 			}
 
-			// Set the provider user ID on the user model and update
 			provider.SetProviderUserID(user, oauthUser.ProviderUserID)
 			if err := tx.Model(user).Updates(map[string]interface{}{
 				"github_id":   user.GitHubId,
@@ -412,10 +411,9 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 				"wechat_id":   user.WeChatId,
 				"telegram_id": user.TelegramId,
 			}).Error; err != nil {
-				return err
+				return 0, err
 			}
-
-			return nil
+			return user.Id, nil
 		})
 		if err != nil {
 			return nil, err

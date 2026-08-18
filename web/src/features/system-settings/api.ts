@@ -50,7 +50,10 @@ export async function getRegistrationProtectionSetting() {
 }
 
 export async function updateRegistrationProtectionSetting(
-  setting: Omit<RegistrationProtectionResponse['data'], 'id' | 'updated_at'>
+  setting: Omit<
+    RegistrationProtectionResponse['data'],
+    'id' | 'updated_at' | 'asn_database_available' | 'asn_database_error'
+  >
 ) {
   const res = await api.put<RegistrationProtectionResponse>(
     '/api/option/registration-protection',
