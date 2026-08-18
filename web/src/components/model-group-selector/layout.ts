@@ -17,6 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 export const modelGroupSelectorLayoutClasses = {
+  trigger: 'w-full max-w-[18rem] sm:w-[18rem]',
+  triggerModelLabel: 'min-w-0 flex-1 truncate text-left',
+  triggerGroupBadge:
+    'hidden min-w-0 max-w-24 shrink overflow-hidden sm:inline-flex',
+  triggerGroupLabel: 'min-w-0 truncate',
   desktopPanel: 'max-h-[min(50vh,28rem)] overflow-hidden',
   desktopContent:
     'grid h-[min(50vh,28rem)] max-h-[min(50vh,28rem)] min-h-0 gap-3 p-2 md:grid-cols-[9.5rem_minmax(0,1fr)]',

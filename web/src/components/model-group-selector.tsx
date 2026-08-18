@@ -662,9 +662,10 @@ export const ModelGroupSelector: React.FC<ModelGroupSelectorProps> = ({
     <Button
       aria-expanded={open}
       className={cn(
-        'h-8 max-w-[15rem] justify-start gap-2 border px-2.5 font-medium shadow-none',
+        'h-8 justify-start gap-2 border px-2.5 font-medium shadow-none',
         'bg-background/80 hover:bg-accent/70 text-foreground',
         'focus:!ring-0 focus:!outline-none',
+        modelGroupSelectorLayoutClasses.trigger,
         className
       )}
       disabled={disabled}
@@ -673,11 +674,27 @@ export const ModelGroupSelector: React.FC<ModelGroupSelectorProps> = ({
       variant='outline'
     >
       <CpuIcon className='text-muted-foreground size-4 shrink-0' />
-      <span className='min-w-0 truncate text-xs'>
+      <span
+        className={cn(
+          modelGroupSelectorLayoutClasses.triggerModelLabel,
+          'text-xs'
+        )}
+        title={currentModel?.label || t('Model')}
+      >
         {currentModel?.label || t('Model')}
       </span>
-      <span className='bg-muted text-muted-foreground hidden max-w-20 shrink-0 rounded px-1.5 py-0.5 text-[10px] sm:inline-flex'>
-        {currentGroup?.label || t('Group')}
+      <span
+        className={cn(
+          modelGroupSelectorLayoutClasses.triggerGroupBadge,
+          'bg-muted text-muted-foreground items-center rounded px-1.5 py-0.5 text-[10px]'
+        )}
+      >
+        <span
+          className={modelGroupSelectorLayoutClasses.triggerGroupLabel}
+          title={currentGroup?.label || t('Group')}
+        >
+          {currentGroup?.label || t('Group')}
+        </span>
       </span>
       <ChevronsUpDown className='text-muted-foreground ml-auto size-3.5 shrink-0 opacity-60' />
     </Button>

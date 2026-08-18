@@ -32,6 +32,25 @@ describe('model group selector layout', () => {
     expect(groupScrollClasses.includes('content-start')).toBeTruthy()
   })
 
+  test('keeps the selected model and group inside a wider trigger', () => {
+    const triggerClasses = modelGroupSelectorLayoutClasses.trigger.split(' ')
+    const modelLabelClasses =
+      modelGroupSelectorLayoutClasses.triggerModelLabel.split(' ')
+    const groupBadgeClasses =
+      modelGroupSelectorLayoutClasses.triggerGroupBadge.split(' ')
+    const groupLabelClasses =
+      modelGroupSelectorLayoutClasses.triggerGroupLabel.split(' ')
+
+    expect(triggerClasses.includes('max-w-[18rem]')).toBeTruthy()
+    expect(triggerClasses.includes('sm:w-[18rem]')).toBeTruthy()
+    expect(modelLabelClasses.includes('flex-1')).toBeTruthy()
+    expect(modelLabelClasses.includes('truncate')).toBeTruthy()
+    expect(groupBadgeClasses.includes('min-w-0')).toBeTruthy()
+    expect(groupBadgeClasses.includes('max-w-24')).toBeTruthy()
+    expect(groupBadgeClasses.includes('overflow-hidden')).toBeTruthy()
+    expect(groupLabelClasses.includes('truncate')).toBeTruthy()
+  })
+
   test('centers the selected group inside its own scroll container', () => {
     const scrollCalls: ScrollToOptions[] = []
     const selectedOption = {
