@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
 import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
+import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 export type TopNavLink = {
@@ -37,8 +38,8 @@ export type TopNavLink = {
  * {
  *   home: true,
  *   console: true,
- *   pricing: { enabled: true, requireAuth: false },
- *   rankings: { enabled: true, requireAuth: false },
+ *   pricing: { enabled: true, requireAuth: false, adminOnly: false },
+ *   rankings: { enabled: true, requireAuth: false, adminOnly: false },
  *   docs: true,
  *   about: true
  * }
@@ -59,6 +60,7 @@ export function useTopNavLinks(): TopNavLink[] {
   const docsLink: string | undefined = status?.docs_link as string | undefined
 
   const isAuthed = !!auth?.user
+  const isAdmin = (auth?.user?.role ?? ROLE.GUEST) >= ROLE.ADMIN
 
   const links: TopNavLink[] = []
 
@@ -81,7 +83,12 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Rankings
   const rankings = modules?.rankings
-  if (rankings && typeof rankings === 'object' && rankings.enabled) {
+  if (
+    rankings &&
+    typeof rankings === 'object' &&
+    rankings.enabled &&
+    (!rankings.adminOnly || isAdmin)
+  ) {
     const requiresAuth = rankings.requireAuth && !isAuthed
     links.push({ title: t('Rankings'), href: '/rankings', requiresAuth })
   }

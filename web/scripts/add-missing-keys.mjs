@@ -6,6 +6,9 @@ const values = {
   en: {
     Automatic: 'Automatic',
     'Block IP': 'Block IP',
+    'Block IP {{ip}}': 'Block IP {{ip}}',
+    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
+      'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.',
     'Enter a valid IP and duration': 'Enter a valid IP and duration',
     'Failed to block IP': 'Failed to block IP',
     'Failed to unblock IP': 'Failed to unblock IP',
@@ -25,6 +28,9 @@ const values = {
   zh: {
     Automatic: '自动',
     'Block IP': '封禁 IP',
+    'Block IP {{ip}}': '封禁 IP {{ip}}',
+    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
+      '封禁来自 {{ip}} 的注册请求 24 小时？之后可在 IP 小黑屋中解除封禁。',
     'Enter a valid IP and duration': '请输入有效的 IP 和封禁时长',
     'Failed to block IP': 'IP 封禁失败',
     'Failed to unblock IP': 'IP 解封失败',
@@ -44,6 +50,9 @@ const values = {
   'zh-TW': {
     Automatic: '自動',
     'Block IP': '封鎖 IP',
+    'Block IP {{ip}}': '封鎖 IP {{ip}}',
+    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
+      '封鎖來自 {{ip}} 的註冊請求 24 小時？之後可在 IP 小黑屋中解除封鎖。',
     'Enter a valid IP and duration': '請輸入有效的 IP 和封鎖時長',
     'Failed to block IP': 'IP 封鎖失敗',
     'Failed to unblock IP': 'IP 解除封鎖失敗',
@@ -63,6 +72,9 @@ const values = {
   fr: {
     Automatic: 'Automatique',
     'Block IP': 'Bloquer l’IP',
+    'Block IP {{ip}}': 'Bloquer l’IP {{ip}}',
+    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
+      'Bloquer les inscriptions depuis {{ip}} pendant 24 heures ? Vous pourrez ensuite débloquer cette IP dans la gestion des blocages IP.',
     'Enter a valid IP and duration': 'Saisissez une IP et une durée valides',
     'Failed to block IP': 'Échec du blocage de l’IP',
     'Failed to unblock IP': 'Échec du déblocage de l’IP',
@@ -82,6 +94,9 @@ const values = {
   ja: {
     Automatic: '自動',
     'Block IP': 'IP をブロック',
+    'Block IP {{ip}}': 'IP {{ip}} をブロック',
+    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
+      '{{ip}} からの登録を 24 時間ブロックしますか？後で IP ブロック管理から解除できます。',
     'Enter a valid IP and duration': '有効な IP と期間を入力してください',
     'Failed to block IP': 'IP のブロックに失敗しました',
     'Failed to unblock IP': 'IP のブロック解除に失敗しました',
@@ -101,6 +116,9 @@ const values = {
   ru: {
     Automatic: 'Автоматически',
     'Block IP': 'Заблокировать IP',
+    'Block IP {{ip}}': 'Заблокировать IP {{ip}}',
+    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
+      'Заблокировать регистрацию с IP {{ip}} на 24 часа? Позже блокировку можно снять в разделе блокировок IP.',
     'Enter a valid IP and duration': 'Введите корректный IP и срок',
     'Failed to block IP': 'Не удалось заблокировать IP',
     'Failed to unblock IP': 'Не удалось разблокировать IP',
@@ -120,6 +138,9 @@ const values = {
   vi: {
     Automatic: 'Tự động',
     'Block IP': 'Chặn IP',
+    'Block IP {{ip}}': 'Chặn IP {{ip}}',
+    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
+      'Chặn đăng ký từ {{ip}} trong 24 giờ? Bạn có thể bỏ chặn sau trong phần quản lý chặn IP.',
     'Enter a valid IP and duration': 'Nhập IP và thời hạn hợp lệ',
     'Failed to block IP': 'Không thể chặn IP',
     'Failed to unblock IP': 'Không thể bỏ chặn IP',
@@ -448,6 +469,52 @@ const paymentAmountErrorValues = {
 }
 
 for (const [locale, additions] of Object.entries(paymentAmountErrorValues)) {
+  Object.assign(values[locale], additions)
+}
+
+const rankingsAdminValues = {
+  en: {
+    'Only administrators can view rankings':
+      'Only administrators can view rankings',
+    'When enabled, only administrators can open the rankings page and access its data.':
+      'When enabled, only administrators can open the rankings page and access its data.',
+  },
+  zh: {
+    'Only administrators can view rankings': '仅管理员可查看排行榜',
+    'When enabled, only administrators can open the rankings page and access its data.':
+      '启用后，只有管理员可以打开排行榜页面并访问其数据。',
+  },
+  'zh-TW': {
+    'Only administrators can view rankings': '僅管理員可查看排行榜',
+    'When enabled, only administrators can open the rankings page and access its data.':
+      '啟用後，只有管理員可以開啟排行榜頁面並存取其資料。',
+  },
+  fr: {
+    'Only administrators can view rankings':
+      'Réserver le classement aux administrateurs',
+    'When enabled, only administrators can open the rankings page and access its data.':
+      'Lorsque cette option est activée, seuls les administrateurs peuvent ouvrir le classement et accéder à ses données.',
+  },
+  ja: {
+    'Only administrators can view rankings': 'ランキングを管理者のみに表示',
+    'When enabled, only administrators can open the rankings page and access its data.':
+      '有効にすると、管理者だけがランキングページを開いてデータにアクセスできます。',
+  },
+  ru: {
+    'Only administrators can view rankings':
+      'Показывать рейтинг только администраторам',
+    'When enabled, only administrators can open the rankings page and access its data.':
+      'Если включено, открыть страницу рейтинга и получить доступ к ее данным смогут только администраторы.',
+  },
+  vi: {
+    'Only administrators can view rankings':
+      'Chỉ quản trị viên được xem bảng xếp hạng',
+    'When enabled, only administrators can open the rankings page and access its data.':
+      'Khi bật, chỉ quản trị viên mới có thể mở trang bảng xếp hạng và truy cập dữ liệu.',
+  },
+}
+
+for (const [locale, additions] of Object.entries(rankingsAdminValues)) {
   Object.assign(values[locale], additions)
 }
 

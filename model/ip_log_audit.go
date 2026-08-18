@@ -256,7 +256,7 @@ func ListIPLogAudits(startIdx, limit int, keyword, sortBy string) ([]*IPLogAudit
 	order := "last_seen_at desc, id desc"
 	switch sortBy {
 	case "calls":
-		order = "request_count desc, id desc"
+		order = "(consume_count + error_count) desc, id desc"
 	case "errors":
 		order = "error_count desc, id desc"
 	case "quota":
@@ -284,6 +284,7 @@ func ListIPLogAudits(startIdx, limit int, keyword, sortBy string) ([]*IPLogAudit
 		banned[ip] = struct{}{}
 	}
 	for _, audit := range audits {
+		audit.RequestCount = audit.ConsumeCount + audit.ErrorCount
 		_, audit.Banned = banned[audit.IP]
 	}
 	return audits, total, nil
@@ -292,7 +293,7 @@ func ListIPLogAudits(startIdx, limit int, keyword, sortBy string) ([]*IPLogAudit
 func GetIPLogAuditSummary() (IPLogAuditSummary, error) {
 	var summary IPLogAuditSummary
 	if err := DB.Model(&IPLogAudit{}).Select(
-		"COUNT(*) AS ip_count, COALESCE(SUM(request_count), 0) AS request_count, COALESCE(SUM(error_count), 0) AS error_count, COALESCE(SUM(log_count), 0) AS log_count",
+		"COUNT(*) AS ip_count, COALESCE(SUM(consume_count), 0) + COALESCE(SUM(error_count), 0) AS request_count, COALESCE(SUM(error_count), 0) AS error_count, COALESCE(SUM(log_count), 0) AS log_count",
 	).Scan(&summary).Error; err != nil {
 		return summary, err
 	}

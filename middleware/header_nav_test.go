@@ -39,6 +39,16 @@ func withHeaderNavModules(t *testing.T, raw string) {
 func performHeaderNavRequest(t *testing.T, handler gin.HandlerFunc, authenticated bool) *httptest.ResponseRecorder {
 	t.Helper()
 
+	role := 0
+	if authenticated {
+		role = common.RoleCommonUser
+	}
+	return performHeaderNavRequestWithRole(t, handler, role)
+}
+
+func performHeaderNavRequestWithRole(t *testing.T, handler gin.HandlerFunc, role int) *httptest.ResponseRecorder {
+	t.Helper()
+
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/api/test", handler, func(c *gin.Context) {
@@ -46,7 +56,7 @@ func performHeaderNavRequest(t *testing.T, handler gin.HandlerFunc, authenticate
 	})
 
 	var accessToken string
-	if authenticated {
+	if role >= common.RoleCommonUser {
 		previousDB, previousRedis := model.DB, common.RedisEnabled
 		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 		require.NoError(t, err)
@@ -61,7 +71,7 @@ func performHeaderNavRequest(t *testing.T, handler gin.HandlerFunc, authenticate
 		user := model.User{
 			Username:    "tester",
 			Password:    "unused-password-hash",
-			Role:        common.RoleCommonUser,
+			Role:        role,
 			Status:      common.UserStatusEnabled,
 			Group:       "default",
 			AuthVersion: 1,
@@ -72,7 +82,7 @@ func performHeaderNavRequest(t *testing.T, handler gin.HandlerFunc, authenticate
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/test", nil)
-	if authenticated {
+	if role >= common.RoleCommonUser {
 		request.Header.Set("Authorization", "Bearer "+accessToken)
 	}
 	router.ServeHTTP(recorder, request)
@@ -112,6 +122,28 @@ func TestHeaderNavModuleAuthRequiresLoginForRankings(t *testing.T) {
 	recorder := performHeaderNavRequest(t, HeaderNavModuleAuth("rankings"), false)
 
 	require.Equal(t, http.StatusUnauthorized, recorder.Code)
+}
+
+func TestHeaderNavModuleAuthRestrictsAdminOnlyRankings(t *testing.T) {
+	tests := []struct {
+		name       string
+		role       int
+		statusCode int
+	}{
+		{name: "anonymous", role: 0, statusCode: http.StatusUnauthorized},
+		{name: "common user", role: common.RoleCommonUser, statusCode: http.StatusForbidden},
+		{name: "administrator", role: common.RoleAdminUser, statusCode: http.StatusOK},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			withHeaderNavModules(t, `{"rankings":{"enabled":true,"requireAuth":false,"adminOnly":true}}`)
+
+			recorder := performHeaderNavRequestWithRole(t, HeaderNavModuleAuth("rankings"), test.role)
+
+			require.Equal(t, test.statusCode, recorder.Code)
+		})
+	}
 }
 
 func TestHeaderNavModuleAuthRejectsLegacyDisabledModule(t *testing.T) {

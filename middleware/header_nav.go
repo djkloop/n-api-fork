@@ -12,12 +12,14 @@ import (
 type headerNavAccess struct {
 	Enabled     bool
 	RequireAuth bool
+	AdminOnly   bool
 }
 
 func getHeaderNavAccess(module string) headerNavAccess {
 	fallback := headerNavAccess{
 		Enabled:     true,
 		RequireAuth: false,
+		AdminOnly:   false,
 	}
 
 	common.OptionMapRWMutex.RLock()
@@ -60,6 +62,9 @@ func parseHeaderNavAccess(raw any, fallback headerNavAccess) headerNavAccess {
 		}
 		if requireAuth, ok := value["requireAuth"]; ok {
 			access.RequireAuth = parseHeaderNavBool(requireAuth, fallback.RequireAuth)
+		}
+		if adminOnly, ok := value["adminOnly"]; ok {
+			access.AdminOnly = parseHeaderNavBool(adminOnly, fallback.AdminOnly)
 		}
 		return access
 	default:
@@ -113,6 +118,11 @@ func HeaderNavModuleAuth(module string) gin.HandlerFunc {
 			return
 		}
 
+		if access.AdminOnly {
+			AdminAuth()(c)
+			return
+		}
+
 		if access.RequireAuth {
 			UserAuth()(c)
 			return
@@ -125,6 +135,11 @@ func HeaderNavModuleAuth(module string) gin.HandlerFunc {
 func HeaderNavModulePublicOrUserAuth(module string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		access := getHeaderNavAccess(module)
+		if access.AdminOnly {
+			AdminAuth()(c)
+			return
+		}
+
 		if !access.Enabled || access.RequireAuth {
 			UserAuth()(c)
 			return

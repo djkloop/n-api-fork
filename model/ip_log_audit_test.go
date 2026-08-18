@@ -65,6 +65,33 @@ func TestScanIPLogAuditsAggregatesAndResumesFromCursor(t *testing.T) {
 	assert.Equal(t, "gpt-next", audit.LastModelName)
 }
 
+func TestListIPLogAuditsDerivesRequestCountsFromOutcomes(t *testing.T) {
+	require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&IPLogAudit{}).Error)
+	require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&IPLogAuditCursor{}).Error)
+
+	now := time.Now().Unix()
+	require.NoError(t, DB.Create(&IPLogAudit{
+		IP: "192.0.2.10", FirstSeenAt: now, LastSeenAt: now,
+		RequestCount: 0, ConsumeCount: 3, ErrorCount: 1,
+	}).Error)
+	require.NoError(t, DB.Create(&IPLogAudit{
+		IP: "192.0.2.11", FirstSeenAt: now, LastSeenAt: now,
+		RequestCount: 99, ConsumeCount: 1, ErrorCount: 0,
+	}).Error)
+
+	items, total, err := ListIPLogAudits(0, 10, "", "calls")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, total)
+	require.Len(t, items, 2)
+	assert.Equal(t, "192.0.2.10", items[0].IP)
+	assert.EqualValues(t, 4, items[0].RequestCount)
+	assert.EqualValues(t, 1, items[1].RequestCount)
+
+	summary, err := GetIPLogAuditSummary()
+	require.NoError(t, err)
+	assert.EqualValues(t, 5, summary.RequestCount)
+}
+
 func TestListIPLogAuditsMarksActiveBans(t *testing.T) {
 	require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&IPLogAudit{}).Error)
 	require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&IPBan{}).Error)

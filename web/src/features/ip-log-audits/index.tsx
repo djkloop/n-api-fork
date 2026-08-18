@@ -1,9 +1,20 @@
-import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Eye } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight, Eye, ShieldBan } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { SectionPageLayout } from '@/components/layout'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -22,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { createIPBan } from '@/features/ip-bans/api'
 import { formatNumber, formatTimestampToDate } from '@/lib/format'
 
 import { getIPLogAudits, type IPLogAudit, type IPLogAuditSort } from './api'
@@ -40,16 +52,36 @@ function formatAuditType(
 
 export function IPLogAudits() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const [keyword, setKeyword] = useState('')
   const [sort, setSort] = useState<IPLogAuditSort>('last_seen')
   const [page, setPage] = useState(1)
   const [selectedAudit, setSelectedAudit] = useState<IPLogAudit | null>(null)
+  const [pendingBanAudit, setPendingBanAudit] = useState<IPLogAudit | null>(
+    null
+  )
   const [expandedIP, setExpandedIP] = useState<string | null>(null)
 
   const query = useQuery({
     queryKey: ['ip-log-audits', keyword, sort, page],
     queryFn: () => getIPLogAudits({ keyword, sort, page, pageSize }),
     refetchInterval: 60_000,
+  })
+  const banMutation = useMutation({
+    mutationFn: (audit: IPLogAudit) =>
+      createIPBan({
+        ip: audit.ip,
+        reason: t('Manual block'),
+        block_outbound: false,
+        expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      }),
+    onSuccess: () => {
+      toast.success(t('IP blocked successfully'))
+      setPendingBanAudit(null)
+      void queryClient.invalidateQueries({ queryKey: ['ip-log-audits'] })
+      void queryClient.invalidateQueries({ queryKey: ['ip-bans'] })
+    },
+    onError: () => toast.error(t('Failed to block IP')),
   })
   const data = query.data?.data
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))
@@ -72,6 +104,10 @@ export function IPLogAudits() {
   }
 
   const summary = data?.summary
+  let sortLabel = t('Last seen')
+  if (sort === 'calls') sortLabel = t('Most calls')
+  if (sort === 'errors') sortLabel = t('Most errors')
+  if (sort === 'quota') sortLabel = t('Highest quota')
 
   return (
     <SectionPageLayout fixedContent>
@@ -127,7 +163,9 @@ export function IPLogAudits() {
             />
             <Select value={sort} onValueChange={updateSort}>
               <SelectTrigger className='sm:w-48' aria-label={t('Sort by')}>
-                <SelectValue placeholder={t('Sort by')} />
+                <SelectValue placeholder={t('Sort by')}>
+                  {sortLabel}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='last_seen'>{t('Last seen')}</SelectItem>
@@ -183,7 +221,24 @@ export function IPLogAudits() {
                             />
                           </Button>
                           <div className='min-w-0'>
-                            <div className='font-mono'>{audit.ip}</div>
+                            <div className='flex items-center gap-1'>
+                              <span className='font-mono'>{audit.ip}</span>
+                              {!audit.banned && (
+                                <Button
+                                  variant='destructive'
+                                  size='icon-xs'
+                                  aria-label={t('Block IP {{ip}}', {
+                                    ip: audit.ip,
+                                  })}
+                                  title={t('Block IP {{ip}}', {
+                                    ip: audit.ip,
+                                  })}
+                                  onClick={() => setPendingBanAudit(audit)}
+                                >
+                                  <ShieldBan className='size-3' />
+                                </Button>
+                              )}
+                            </div>
                             <div className='text-muted-foreground text-xs'>
                               {audit.network}
                             </div>
@@ -206,12 +261,13 @@ export function IPLogAudits() {
                       <TableCell className='text-right'>
                         <Button
                           variant='ghost'
-                          size='icon-sm'
+                          size='sm'
                           aria-label={t('View IP details')}
                           title={t('View IP details')}
                           onClick={() => setSelectedAudit(audit)}
                         >
                           <Eye className='size-4' />
+                          {t('Details')}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -268,17 +324,53 @@ export function IPLogAudits() {
             </div>
           )}
         </div>
+        {selectedAudit && (
+          <Dialog
+            open
+            onOpenChange={(open) => {
+              if (!open) setSelectedAudit(null)
+            }}
+          >
+            <DialogContent className='max-h-[min(760px,calc(100vh-2rem))] max-w-2xl overflow-y-auto'>
+              <IPLogAuditDetails audit={selectedAudit} />
+            </DialogContent>
+          </Dialog>
+        )}
+        <AlertDialog
+          open={pendingBanAudit !== null}
+          onOpenChange={(open) => {
+            if (!open && !banMutation.isPending) setPendingBanAudit(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('Block IP')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingBanAudit &&
+                  t(
+                    'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.',
+                    { ip: pendingBanAudit.ip }
+                  )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={banMutation.isPending}>
+                {t('Cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant='destructive'
+                disabled={!pendingBanAudit || banMutation.isPending}
+                onClick={() => {
+                  if (pendingBanAudit) banMutation.mutate(pendingBanAudit)
+                }}
+              >
+                <ShieldBan className='size-4' />
+                {t('Block IP')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SectionPageLayout.Content>
-      <Dialog
-        open={selectedAudit !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedAudit(null)
-        }}
-      >
-        <DialogContent className='max-h-[min(760px,calc(100vh-2rem))] max-w-2xl overflow-y-auto'>
-          {selectedAudit && <IPLogAuditDetails audit={selectedAudit} />}
-        </DialogContent>
-      </Dialog>
     </SectionPageLayout>
   )
 }
