@@ -18,12 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Save } from 'lucide-react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 
@@ -36,7 +38,6 @@ import {
   SettingsSwitchContent,
   SettingsSwitchItem,
 } from '../components/settings-form-layout'
-import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 
 const schema = z.object({
@@ -100,10 +101,12 @@ export function RegistrationProtectionSection() {
   return (
     <SettingsSection title={t('Registration IP Protection')}>
       <SettingsForm onSubmit={form.handleSubmit(onSubmit)} autoComplete='off'>
-        <SettingsPageFormActions
-          onSave={form.handleSubmit(onSubmit)}
-          isSaving={mutation.isPending}
-        />
+        <div className='flex justify-end'>
+          <Button type='submit' size='sm' disabled={mutation.isPending}>
+            <Save data-icon='inline-start' />
+            {mutation.isPending ? t('Saving...') : t('Save Changes')}
+          </Button>
+        </div>
         <SettingsSwitchItem>
           <SettingsSwitchContent>
             <div className='font-medium'>
