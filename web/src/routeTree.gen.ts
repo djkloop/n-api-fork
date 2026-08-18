@@ -40,6 +40,7 @@ import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedDashboardSectionRouteImport } from './routes/_authenticated/dashboard/$section'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedIpBansIndexRouteImport } from './routes/_authenticated/ip-bans/index'
+import { Route as AuthenticatedIpLogAuditsIndexRouteImport } from './routes/_authenticated/ip-log-audits/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
@@ -226,6 +227,12 @@ const AuthenticatedIpBansIndexRoute =
   AuthenticatedIpBansIndexRouteImport.update({
     id: '/ip-bans/',
     path: '/ip-bans/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedIpLogAuditsIndexRoute =
+  AuthenticatedIpLogAuditsIndexRouteImport.update({
+    id: '/ip-log-audits/',
+    path: '/ip-log-audits/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
@@ -426,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/ip-bans/': typeof AuthenticatedIpBansIndexRoute
+  '/ip-log-audits/': typeof AuthenticatedIpLogAuditsIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
@@ -484,6 +492,7 @@ export interface FileRoutesByTo {
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/ip-bans': typeof AuthenticatedIpBansIndexRoute
+  '/ip-log-audits': typeof AuthenticatedIpLogAuditsIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
@@ -546,6 +555,7 @@ export interface FileRoutesById {
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/ip-bans/': typeof AuthenticatedIpBansIndexRoute
+  '/_authenticated/ip-log-audits/': typeof AuthenticatedIpLogAuditsIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
@@ -607,6 +617,7 @@ export interface FileRouteTypes {
     | '/channels/'
     | '/dashboard/'
     | '/ip-bans/'
+    | '/ip-log-audits/'
     | '/keys/'
     | '/models/'
     | '/playground/'
@@ -665,6 +676,7 @@ export interface FileRouteTypes {
     | '/channels'
     | '/dashboard'
     | '/ip-bans'
+    | '/ip-log-audits'
     | '/keys'
     | '/models'
     | '/playground'
@@ -726,6 +738,7 @@ export interface FileRouteTypes {
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
     | '/_authenticated/ip-bans/'
+    | '/_authenticated/ip-log-audits/'
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
     | '/_authenticated/playground/'
@@ -990,6 +1003,13 @@ declare module '@tanstack/react-router' {
       path: '/ip-bans'
       fullPath: '/ip-bans/'
       preLoaderRoute: typeof AuthenticatedIpBansIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ip-log-audits/': {
+      id: '/_authenticated/ip-log-audits/'
+      path: '/ip-log-audits'
+      fullPath: '/ip-log-audits/'
+      preLoaderRoute: typeof AuthenticatedIpLogAuditsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/keys/': {
@@ -1285,6 +1305,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedIpBansIndexRoute: typeof AuthenticatedIpBansIndexRoute
+  AuthenticatedIpLogAuditsIndexRoute: typeof AuthenticatedIpLogAuditsIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
@@ -1309,6 +1330,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedIpBansIndexRoute: AuthenticatedIpBansIndexRoute,
+  AuthenticatedIpLogAuditsIndexRoute: AuthenticatedIpLogAuditsIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,

@@ -150,6 +150,8 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/ip-bans", controller.GetIPBans)
 				adminRoute.POST("/ip-bans", controller.CreateIPBan)
 				adminRoute.DELETE("/ip-bans/:id", controller.ReleaseIPBan)
+				adminRoute.GET("/ip-log-audits", controller.GetIPLogAudits)
+				adminRoute.GET("/ip-log-audits/:ip/logs", controller.GetIPLogAuditEvents)
 
 				// Admin 2FA routes
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)

@@ -27,6 +27,7 @@ import {
   ListTodo,
   MessageSquare,
   Radio,
+  ScanSearch,
   ServerCog,
   Settings,
   ShieldBan,
@@ -144,6 +145,11 @@ export function useSidebarData(): SidebarData {
             title: t('IP Blackroom'),
             url: '/ip-bans',
             icon: ShieldBan,
+          },
+          {
+            title: t('IP Log Audit'),
+            url: '/ip-log-audits',
+            icon: ScanSearch,
           },
           {
             title: t('Subscriptions'),

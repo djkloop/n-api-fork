@@ -22,6 +22,7 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(ipLogAuditHandler{})
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and
@@ -150,6 +151,27 @@ func (asyncTaskPollHandler) NewPayload() any { return nil }
 func (asyncTaskPollHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
 	summary := service.RunTaskPollingOnce(ctx, service.NewSystemTaskProgressReporter(task, runnerID))
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+// ipLogAuditHandler aggregates IP-bearing logs into the primary database every
+// ten minutes. The model layer keeps the cursor and updates transactional.
+type ipLogAuditHandler struct{}
+
+func (ipLogAuditHandler) Type() string { return model.SystemTaskTypeIPLogAudit }
+
+func (ipLogAuditHandler) Enabled() bool { return true }
+
+func (ipLogAuditHandler) Interval() time.Duration { return 10 * time.Minute }
+
+func (ipLogAuditHandler) NewPayload() any { return nil }
+
+func (ipLogAuditHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	result, err := model.ScanIPLogAudits(ctx)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, result, err)
+		return
+	}
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, result, nil)
 }
 
 func finishSystemTaskHandler(task *model.SystemTask, runnerID string, status model.SystemTaskStatus, result any, runErr error) {

@@ -59,6 +59,8 @@ func TestMain(m *testing.M) {
 		&SystemTaskLock{},
 		&IPBan{},
 		&RegistrationIPEvent{},
+		&IPLogAudit{},
+		&IPLogAuditCursor{},
 		&RegistrationGuardLock{},
 		&RegistrationProtectionSetting{},
 	); err != nil {

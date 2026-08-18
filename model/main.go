@@ -292,6 +292,8 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&IPBan{},
 		&RegistrationIPEvent{},
+		&IPLogAudit{},
+		&IPLogAuditCursor{},
 		&RegistrationGuardLock{},
 		&RegistrationProtectionSetting{},
 		&CasbinRule{},
@@ -362,6 +364,8 @@ func migrateDBFast() error {
 		{&SystemTaskLock{}, "SystemTaskLock"},
 		{&IPBan{}, "IPBan"},
 		{&RegistrationIPEvent{}, "RegistrationIPEvent"},
+		{&IPLogAudit{}, "IPLogAudit"},
+		{&IPLogAuditCursor{}, "IPLogAuditCursor"},
 		{&RegistrationGuardLock{}, "RegistrationGuardLock"},
 		{&RegistrationProtectionSetting{}, "RegistrationProtectionSetting"},
 	}
