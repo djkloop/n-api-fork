@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Eye, ShieldBan } from 'lucide-react'
-import { Fragment, useState } from 'react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Eye,
+  ShieldBan,
+} from 'lucide-react'
+import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -35,6 +42,7 @@ import {
 } from '@/components/ui/table'
 import { createIPBan } from '@/features/ip-bans/api'
 import { formatNumber, formatTimestampToDate } from '@/lib/format'
+import { getPageNumbers } from '@/lib/utils'
 
 import { getIPLogAudits, type IPLogAudit, type IPLogAuditSort } from './api'
 import { IPLogAuditDetails } from './components/ip-log-audit-details'
@@ -66,6 +74,7 @@ export function IPLogAudits() {
     queryKey: ['ip-log-audits', keyword, sort, page],
     queryFn: () => getIPLogAudits({ keyword, sort, page, pageSize }),
     refetchInterval: 60_000,
+    placeholderData: (previousData) => previousData,
   })
   const banMutation = useMutation({
     mutationFn: (audit: IPLogAudit) =>
@@ -84,7 +93,15 @@ export function IPLogAudits() {
     onError: () => toast.error(t('Failed to block IP')),
   })
   const data = query.data?.data
-  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))
+  const totalPages = Math.max(
+    1,
+    Math.ceil((data?.total ?? 0) / (data?.page_size || pageSize))
+  )
+  const pageNumbers = getPageNumbers(page, totalPages)
+
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages)
+  }, [data, page, totalPages])
 
   const updateKeyword = (value: string) => {
     setKeyword(value)
@@ -113,12 +130,12 @@ export function IPLogAudits() {
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>{t('IP Log Audit')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <div className='space-y-4'>
-          <div className='text-muted-foreground max-w-3xl text-sm'>
+        <div className='flex h-full min-h-0 flex-col gap-4'>
+          <div className='text-muted-foreground max-w-3xl shrink-0 text-sm'>
             {t('IP Log Audit description')}
           </div>
 
-          <div className='grid gap-3 border-y py-3 sm:grid-cols-4'>
+          <div className='grid shrink-0 gap-3 border-y py-3 sm:grid-cols-4'>
             <div>
               <div className='text-muted-foreground text-xs'>
                 {t('IP addresses')}
@@ -153,7 +170,7 @@ export function IPLogAudits() {
             </div>
           </div>
 
-          <div className='flex flex-col gap-3 sm:flex-row'>
+          <div className='flex shrink-0 flex-col gap-3 sm:flex-row'>
             <Input
               aria-label={t('Search IP audit')}
               className='sm:max-w-sm'
@@ -176,7 +193,7 @@ export function IPLogAudits() {
             </Select>
           </div>
 
-          <div className='overflow-hidden rounded-lg border'>
+          <div className='min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border'>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -297,30 +314,79 @@ export function IPLogAudits() {
           </div>
 
           {totalPages > 1 && (
-            <div className='flex items-center justify-end gap-2'>
-              <span className='text-muted-foreground text-sm'>
-                {t('Page {{page}} of {{total}}', { page, total: totalPages })}
+            <div className='flex shrink-0 items-center justify-between gap-3 overflow-x-auto'>
+              <span className='text-muted-foreground shrink-0 text-sm'>
+                {t('Page {{page}} of {{total}}', {
+                  page,
+                  total: totalPages,
+                })}
               </span>
-              <Button
-                variant='outline'
-                size='icon-sm'
-                aria-label={t('Previous page')}
-                disabled={page <= 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-              >
-                <ChevronLeft className='size-4' />
-              </Button>
-              <Button
-                variant='outline'
-                size='icon-sm'
-                aria-label={t('Next page')}
-                disabled={page >= totalPages}
-                onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }
-              >
-                <ChevronRight className='size-4' />
-              </Button>
+              <div className='flex shrink-0 items-center gap-1'>
+                <Button
+                  variant='outline'
+                  size='icon-sm'
+                  className='hidden sm:inline-flex'
+                  aria-label={t('Go to first page')}
+                  disabled={page <= 1}
+                  onClick={() => setPage(1)}
+                >
+                  <ChevronsLeft className='size-4' />
+                </Button>
+                <Button
+                  variant='outline'
+                  size='icon-sm'
+                  aria-label={t('Go to previous page')}
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  <ChevronLeft className='size-4' />
+                </Button>
+                {pageNumbers.map((pageNumber, index) =>
+                  typeof pageNumber === 'string' ? (
+                    <span
+                      key={`ellipsis-${pageNumbers[index - 1] ?? 'start'}`}
+                      className='text-muted-foreground px-1 text-sm'
+                      aria-hidden='true'
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <Button
+                      key={pageNumber}
+                      variant={page === pageNumber ? 'default' : 'outline'}
+                      size='icon-sm'
+                      aria-label={t('Go to page {{page}}', {
+                        page: pageNumber,
+                      })}
+                      aria-current={page === pageNumber ? 'page' : undefined}
+                      onClick={() => setPage(pageNumber)}
+                    >
+                      {pageNumber}
+                    </Button>
+                  )
+                )}
+                <Button
+                  variant='outline'
+                  size='icon-sm'
+                  aria-label={t('Go to next page')}
+                  disabled={page >= totalPages}
+                  onClick={() =>
+                    setPage((current) => Math.min(totalPages, current + 1))
+                  }
+                >
+                  <ChevronRight className='size-4' />
+                </Button>
+                <Button
+                  variant='outline'
+                  size='icon-sm'
+                  className='hidden sm:inline-flex'
+                  aria-label={t('Go to last page')}
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(totalPages)}
+                >
+                  <ChevronsRight className='size-4' />
+                </Button>
+              </div>
             </div>
           )}
         </div>

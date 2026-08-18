@@ -135,6 +135,45 @@ describe('IPLogAudits actions', () => {
     ).not.toHaveTextContent('last_seen')
   })
 
+  test('keeps the audit table scrollable and requests the selected page', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getIPLogAudits).mockResolvedValueOnce({
+      success: true,
+      message: '',
+      data: {
+        page: 1,
+        page_size: 20,
+        total: 61,
+        items: [audit],
+        summary: {
+          ip_count: 61,
+          request_count: 3,
+          error_count: 1,
+          log_count: 4,
+          last_scanned_at: 1700000400,
+        },
+      },
+    })
+
+    renderPage()
+
+    await screen.findByText(audit.ip)
+    expect(screen.getByRole('table').parentElement?.parentElement).toHaveClass(
+      'overflow-auto'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Go to page 2' }))
+
+    await waitFor(() => {
+      expect(getIPLogAudits).toHaveBeenLastCalledWith({
+        keyword: '',
+        sort: 'last_seen',
+        page: 2,
+        pageSize: 20,
+      })
+    })
+  })
+
   test('requires confirmation before blocking an IP for 24 hours', async () => {
     const user = userEvent.setup()
     renderPage()
