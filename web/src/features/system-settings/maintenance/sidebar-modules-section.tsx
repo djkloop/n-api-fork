@@ -158,6 +158,10 @@ export function SidebarModulesSection({
         title: t('IP Blackroom'),
         description: t('Manage manual and automatic registration IP blocks.'),
       },
+      ipLogAudit: {
+        title: t('IP Log Audit'),
+        description: t('IP Log Audit description'),
+      },
     },
   }
   const formDefaults = useMemo(() => config, [config])

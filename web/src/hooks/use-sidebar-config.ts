@@ -64,6 +64,7 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     setting: true,
     subscription: true,
     ipBan: true,
+    ipLogAudit: true,
   },
 }
 
