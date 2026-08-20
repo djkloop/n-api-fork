@@ -42,12 +42,8 @@ vi.mock('@/context/theme-provider', () => ({
 vi.mock('@/stores/auth-store', () => ({
   useAuthStore: () => ({ auth: { user: null } }),
 }))
-vi.mock('../components', () => ({
-  CTA: () => null,
-  Features: () => null,
-  Hero: () => null,
-  HowItWorks: () => null,
-  Stats: () => null,
+vi.mock('../components/migrated', () => ({
+  MigratedHomeLanding: () => null,
 }))
 vi.mock('../hooks', () => ({
   useHomePageContent: () => ({
