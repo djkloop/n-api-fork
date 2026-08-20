@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import i18next from 'i18next'
 import { Code2, Eye, ShieldAlert } from 'lucide-react'
 import * as React from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
@@ -46,6 +47,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 import { confirmPaymentCompliance } from '../api'
@@ -64,9 +66,11 @@ import { CreemProductsVisualEditor } from './creem-products-visual-editor'
 import { PaymentMethodsVisualEditor } from './payment-methods-visual-editor'
 import {
   formatJsonForEditor,
+  formatOriginListForEditor,
   getJsonError,
   normalizeJsonForComparison,
   removeTrailingSlash,
+  serializeOriginList,
 } from './utils'
 import { saveWaffoPancakeConfig } from './waffo-pancake-api'
 import {
@@ -110,6 +114,21 @@ const paymentSchema = z.object({
       isHttpOriginUrl,
       'Enter only a top-level callback domain, for example https://api.example.com, without any path.'
     ),
+  PaymentReturnOrigins: z.string().superRefine((value, ctx) => {
+    const invalidOrigin = value
+      .split(/\r?\n/)
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .find((origin) => !isHttpOriginUrl(origin))
+    if (invalidOrigin) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: i18next.t(
+          'Enter only top-level HTTP or HTTPS origins, one per line.'
+        ),
+      })
+    }
+  }),
   PayMethods: z.string().superRefine((value, ctx) => {
     const error = getJsonError(value)
     if (error) {
@@ -352,6 +371,9 @@ export function PaymentSettingsSection({
     mode: 'onChange', // Enable real-time validation
     defaultValues: {
       ...initialFormValues,
+      PaymentReturnOrigins: formatOriginListForEditor(
+        initialFormValues.PaymentReturnOrigins
+      ),
       PayMethods: formatJsonForEditor(initialFormValues.PayMethods),
       AmountOptions: formatJsonForEditor(initialFormValues.AmountOptions),
       AmountDiscount: formatJsonForEditor(initialFormValues.AmountDiscount),
@@ -409,6 +431,9 @@ export function PaymentSettingsSection({
     initialRef.current = parsedDefaults
     form.reset({
       ...parsedDefaults,
+      PaymentReturnOrigins: formatOriginListForEditor(
+        parsedDefaults.PaymentReturnOrigins
+      ),
       PayMethods: formatJsonForEditor(parsedDefaults.PayMethods),
       AmountOptions: formatJsonForEditor(parsedDefaults.AmountOptions),
       AmountDiscount: formatJsonForEditor(parsedDefaults.AmountDiscount),
@@ -424,6 +449,7 @@ export function PaymentSettingsSection({
       Price: values.Price,
       MinTopUp: values.MinTopUp,
       CustomCallbackAddress: removeTrailingSlash(values.CustomCallbackAddress),
+      PaymentReturnOrigins: serializeOriginList(values.PaymentReturnOrigins),
       PayMethods: values.PayMethods.trim(),
       AmountOptions: values.AmountOptions.trim(),
       AmountDiscount: values.AmountDiscount.trim(),
@@ -467,6 +493,9 @@ export function PaymentSettingsSection({
       MinTopUp: initialRef.current.MinTopUp,
       CustomCallbackAddress: removeTrailingSlash(
         initialRef.current.CustomCallbackAddress
+      ),
+      PaymentReturnOrigins: serializeOriginList(
+        formatOriginListForEditor(initialRef.current.PaymentReturnOrigins)
       ),
       PayMethods: initialRef.current.PayMethods.trim(),
       AmountOptions: initialRef.current.AmountOptions.trim(),
@@ -532,6 +561,16 @@ export function PaymentSettingsSection({
       updates.push({
         key: 'CustomCallbackAddress',
         value: sanitized.CustomCallbackAddress,
+      })
+    }
+
+    if (
+      normalizeJsonForComparison(sanitized.PaymentReturnOrigins) !==
+      normalizeJsonForComparison(initial.PaymentReturnOrigins)
+    ) {
+      updates.push({
+        key: 'payment_setting.return_origins',
+        value: sanitized.PaymentReturnOrigins,
       })
     }
 
@@ -947,6 +986,34 @@ export function PaymentSettingsSection({
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name='PaymentReturnOrigins'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t('Allowed payment return origins')}
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={3}
+                          placeholder={[
+                            'https://ai.pkcfcf.cn',
+                            'https://cybertruckai.top',
+                          ].join('\n')}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Enter one allowed origin per line. Users return to the same origin that started the payment. Requests from other origins fall back to the server address.'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}

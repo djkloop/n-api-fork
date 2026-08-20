@@ -22,6 +22,27 @@ export function removeTrailingSlash(value: string) {
   return trimmed.replace(/\/+$/, '')
 }
 
+export function formatOriginListForEditor(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  try {
+    const parsed = JSON.parse(trimmed)
+    return Array.isArray(parsed)
+      ? parsed.filter((origin) => typeof origin === 'string').join('\n')
+      : trimmed
+  } catch {
+    return trimmed
+  }
+}
+
+export function serializeOriginList(value: string) {
+  const origins = value
+    .split(/\r?\n/)
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+  return JSON.stringify(origins)
+}
+
 export function formatJsonForEditor(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return ''
@@ -52,19 +73,20 @@ function extractErrorPosition(
   const positionMatch = message.match(/at position (\d+)/i)
 
   if (positionMatch) {
-    const position = parseInt(positionMatch[1], 10)
-    const lines = jsonString.substring(0, position).split('\n')
+    const position = Number.parseInt(positionMatch[1], 10)
+    const lines = jsonString.slice(0, position).split('\n')
+    const lastLine = lines.at(-1) ?? ''
     return {
       line: lines.length,
-      column: lines[lines.length - 1].length + 1,
+      column: lastLine.length + 1,
     }
   }
 
   const lineColMatch = message.match(/at line (\d+) column (\d+)/i)
   if (lineColMatch) {
     return {
-      line: parseInt(lineColMatch[1], 10),
-      column: parseInt(lineColMatch[2], 10),
+      line: Number.parseInt(lineColMatch[1], 10),
+      column: Number.parseInt(lineColMatch[2], 10),
     }
   }
 
