@@ -41,7 +41,11 @@ import {
   updateChannelBalance,
 } from '../api'
 import { CHANNEL_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants'
-import type { ChannelTestResponse, CopyChannelParams } from '../types'
+import type {
+  ChannelModelTestItem,
+  ChannelTestResponse,
+  CopyChannelParams,
+} from '../types'
 
 // ============================================================================
 // Query Keys
@@ -54,6 +58,8 @@ export const channelsQueryKeys = {
     [...channelsQueryKeys.lists(), params] as const,
   details: () => [...channelsQueryKeys.all, 'detail'] as const,
   detail: (id: number) => [...channelsQueryKeys.details(), id] as const,
+  testResults: (id: number) =>
+    [...channelsQueryKeys.detail(id), 'test-results'] as const,
 }
 
 function getChannelTestResponseTime(
@@ -281,7 +287,8 @@ export async function handleTestChannel(
     success: boolean,
     responseTime?: number,
     error?: string,
-    errorCode?: string
+    errorCode?: string,
+    testResult?: ChannelModelTestItem
   ) => void
 ): Promise<void> {
   const payload =
@@ -313,7 +320,13 @@ export async function handleTestChannel(
             : undefined
         )
       }
-      onTestComplete?.(true, responseTime)
+      onTestComplete?.(
+        true,
+        responseTime,
+        undefined,
+        undefined,
+        response.data?.test_result
+      )
     } else {
       const errorMsg = response.message || i18next.t(ERROR_MESSAGES.TEST_FAILED)
       if (!options?.silent) {
@@ -323,7 +336,13 @@ export async function handleTestChannel(
             : errorMsg,
         })
       }
-      onTestComplete?.(false, responseTime, errorMsg, response.error_code)
+      onTestComplete?.(
+        false,
+        responseTime,
+        errorMsg,
+        response.error_code,
+        response.data?.test_result
+      )
     }
   } catch (_error: unknown) {
     const err = _error as { response?: { data?: { message?: string } } }

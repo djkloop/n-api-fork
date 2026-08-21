@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   ColumnDef,
   RowSelectionState,
@@ -25,6 +25,7 @@ import type {
 import {
   Check,
   CheckCircle2,
+  ChevronRight,
   Copy,
   Gauge,
   Info,
@@ -34,6 +35,7 @@ import {
 } from 'lucide-react'
 import {
   type ChangeEvent,
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -47,6 +49,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   DataTableBulkActions as BulkActionsToolbar,
   DataTablePagination,
+  DataTableRow,
   DataTableView,
   useDataTable,
 } from '@/components/data-table'
@@ -79,6 +82,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
+import { TableCell, TableRow } from '@/components/ui/table'
 import {
   Tooltip,
   TooltipContent,
@@ -86,8 +90,9 @@ import {
 } from '@/components/ui/tooltip'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { formatTimestampToDate } from '@/lib/format'
 
-import { updateChannel } from '../../api'
+import { getChannelModelTestResults, updateChannel } from '../../api'
 import {
   channelsQueryKeys,
   formatResponseTime,
@@ -95,6 +100,8 @@ import {
 } from '../../lib'
 import type {
   Channel,
+  ChannelModelTestHistory,
+  ChannelModelTestItem,
   GetChannelsResponse,
   SearchChannelsResponse,
 } from '../../types'
@@ -119,6 +126,7 @@ type TestResult = {
   status: TestStatus
   responseTime?: number
   completedAt?: number
+  historyId?: number
   error?: string
   errorCode?: string
 }
@@ -141,6 +149,40 @@ type LatestChannelTestCachePatch = {
 }
 
 type ChannelListCache = GetChannelsResponse | SearchChannelsResponse
+
+function testItemToResult(item: ChannelModelTestItem): TestResult {
+  return {
+    status: item.success ? 'success' : 'error',
+    responseTime: item.response_time,
+    completedAt: item.tested_at * 1000,
+    historyId: item.history?.[0]?.id,
+    error: item.message || undefined,
+    errorCode: item.error_code || undefined,
+  }
+}
+
+function isTestResultNewer(current: TestResult, candidate: TestResult) {
+  const currentCompletedAt = current.completedAt ?? 0
+  const candidateCompletedAt = candidate.completedAt ?? 0
+  if (currentCompletedAt !== candidateCompletedAt) {
+    return currentCompletedAt > candidateCompletedAt
+  }
+  return (current.historyId ?? 0) > (candidate.historyId ?? 0)
+}
+
+function isHistoryNewer(
+  current: ChannelModelTestHistory[],
+  candidate: ChannelModelTestHistory[]
+) {
+  const currentLatest = current[0]
+  const candidateLatest = candidate[0]
+  if (!currentLatest) return false
+  if (!candidateLatest) return true
+  if (currentLatest.tested_at !== candidateLatest.tested_at) {
+    return currentLatest.tested_at > candidateLatest.tested_at
+  }
+  return currentLatest.id > candidateLatest.id
+}
 
 function createChannelTestCachePatch(
   responseTime?: number,
@@ -320,7 +362,7 @@ export function ChannelTestDialog({
   )
 }
 
-function ChannelTestDialogContent({
+export function ChannelTestDialogContent({
   open,
   onOpenChange,
   currentRow,
@@ -336,6 +378,12 @@ function ChannelTestDialogContent({
   const [isStreamTest, setIsStreamTest] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({})
+  const [testHistories, setTestHistories] = useState<
+    Record<string, ChannelModelTestHistory[]>
+  >({})
+  const [expandedModels, setExpandedModels] = useState<Set<string>>(
+    () => new Set()
+  )
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [testingModels, setTestingModels] = useState<Set<string>>(
     () => new Set()
@@ -354,6 +402,17 @@ function ChannelTestDialogContent({
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 30,
+  })
+  const testHistoryQuery = useQuery({
+    queryKey: channelsQueryKeys.testResults(currentChannelId),
+    queryFn: async () => {
+      const response = await getChannelModelTestResults(currentChannelId)
+      if (!response.success) {
+        throw new Error(response.message || t('Failed to load test history.'))
+      }
+      return response.data ?? []
+    },
+    enabled: open,
   })
   const endpointSelectItems = useMemo(
     () =>
@@ -397,12 +456,46 @@ function ChannelTestDialogContent({
 
   useEffect(() => dismissBatchProgressToast, [dismissBatchProgressToast])
 
+  useEffect(() => {
+    if (!open || !testHistoryQuery.data) return
+
+    setTestResults((currentResults) => {
+      const nextResults = { ...currentResults }
+      for (const item of testHistoryQuery.data) {
+        const candidateResult = testItemToResult(item)
+        const currentResult = currentResults[item.model]
+        if (
+          currentResult?.status === 'testing' ||
+          (currentResult && isTestResultNewer(currentResult, candidateResult))
+        ) {
+          continue
+        }
+        nextResults[item.model] = candidateResult
+      }
+      return nextResults
+    })
+
+    setTestHistories((currentHistories) => {
+      const nextHistories = { ...currentHistories }
+      for (const item of testHistoryQuery.data) {
+        const candidateHistory = item.history ?? []
+        const currentHistory = currentHistories[item.model] ?? []
+        if (!isHistoryNewer(currentHistory, candidateHistory)) {
+          nextHistories[item.model] = candidateHistory
+        }
+      }
+      return nextHistories
+    })
+  }, [open, testHistoryQuery.data])
+
   const resetState = useCallback(() => {
     batchStopRequestedRef.current = true
     setEndpointType('auto')
     setIsStreamTest(false)
     setSearchTerm('')
     setTestResults({})
+    setTestHistories({})
+    setExpandedModels(() => new Set())
     setRowSelection({})
     setTestingModels(() => new Set())
     setIsBatchTesting(false)
@@ -494,6 +587,42 @@ function ChannelTestDialogContent({
     }))
   }, [])
 
+  const updatePersistedTestItem = useCallback(
+    (item: ChannelModelTestItem) => {
+      setTestHistories((prev) => ({
+        ...prev,
+        [item.model]: item.history ?? [],
+      }))
+      queryClient.setQueryData<ChannelModelTestItem[]>(
+        channelsQueryKeys.testResults(currentChannelId),
+        (currentItems = []) => {
+          const existingIndex = currentItems.findIndex(
+            (currentItem) => currentItem.model === item.model
+          )
+          if (existingIndex < 0) {
+            return [...currentItems, item]
+          }
+          return currentItems.map((currentItem, index) =>
+            index === existingIndex ? item : currentItem
+          )
+        }
+      )
+    },
+    [currentChannelId, queryClient]
+  )
+
+  const toggleModelHistory = useCallback((model: string) => {
+    setExpandedModels((current) => {
+      const next = new Set(current)
+      if (next.has(model)) {
+        next.delete(model)
+      } else {
+        next.add(model)
+      }
+      return next
+    })
+  }, [])
+
   const updateChannelTestCache = useCallback(
     (patch?: ChannelTestCachePatch) => {
       if (!patch) return
@@ -564,16 +693,23 @@ function ChannelTestDialogContent({
             stream: effectiveStreamTest || undefined,
             silent,
           },
-          (success, responseTime, error, errorCode) => {
-            const completedAt = Date.now()
-            finalResult = {
-              status: success ? 'success' : 'error',
-              responseTime,
-              completedAt,
-              error,
-              errorCode,
-            }
+          (success, responseTime, error, errorCode, testItem) => {
+            const completedAt = testItem?.tested_at
+              ? testItem.tested_at * 1000
+              : Date.now()
+            finalResult = testItem
+              ? testItemToResult(testItem)
+              : {
+                  status: success ? 'success' : 'error',
+                  responseTime,
+                  completedAt,
+                  error,
+                  errorCode,
+                }
             updateTestResult(model, finalResult)
+            if (testItem) {
+              updatePersistedTestItem(testItem)
+            }
           }
         )
       } catch (error: unknown) {
@@ -603,6 +739,7 @@ function ChannelTestDialogContent({
       markModelTesting,
       refreshChannelLists,
       t,
+      updatePersistedTestItem,
       updateTestResult,
     ]
   )
@@ -792,6 +929,21 @@ function ChannelTestDialogContent({
           for (const model of failed) delete next[model]
           return next
         })
+        setTestHistories((prev) => {
+          const next = { ...prev }
+          for (const model of failed) delete next[model]
+          return next
+        })
+        setExpandedModels((prev) => {
+          const next = new Set(prev)
+          for (const model of failed) next.delete(model)
+          return next
+        })
+        queryClient.setQueryData<ChannelModelTestItem[]>(
+          channelsQueryKeys.testResults(currentChannelId),
+          (currentItems = []) =>
+            currentItems.filter((item) => !failedSet.has(item.model))
+        )
         setRowSelection((prev) => {
           const next = { ...prev }
           for (const model of failed) delete next[model]
@@ -814,7 +966,15 @@ function ChannelTestDialogContent({
     } finally {
       setIsDeletingFailed(false)
     }
-  }, [currentRow.id, models, refreshChannelLists, t, testResults])
+  }, [
+    currentChannelId,
+    currentRow.id,
+    models,
+    queryClient,
+    refreshChannelLists,
+    t,
+    testResults,
+  ])
 
   const handleClose = useCallback(() => {
     resetState()
@@ -869,9 +1029,22 @@ function ChannelTestDialogContent({
         cell: ({ row }) => {
           const model = row.original.model
           const isDefault = defaultTestModel === model
+          const isExpanded = expandedModels.has(model)
 
           return (
-            <div className='flex w-max items-center gap-2 whitespace-nowrap'>
+            <div className='flex w-max items-center gap-1 whitespace-nowrap'>
+              <Button
+                variant='ghost'
+                size='icon-sm'
+                className='size-7'
+                onClick={() => toggleModelHistory(model)}
+                aria-expanded={isExpanded}
+                aria-label={t('Toggle test history for {{model}}', { model })}
+              >
+                <ChevronRight
+                  className={`size-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                />
+              </Button>
               <span className='font-medium whitespace-nowrap' title={model}>
                 {model}
               </span>
@@ -950,11 +1123,13 @@ function ChannelTestDialogContent({
     ],
     [
       defaultTestModel,
+      expandedModels,
       isBatchTesting,
       t,
       testResults,
       testingModels,
       testSingleModel,
+      toggleModelHistory,
     ]
   )
 
@@ -1146,6 +1321,37 @@ function ChannelTestDialogContent({
                 getColumnClassName={(columnId) =>
                   getTestTableColumnClass(columnId)
                 }
+                renderRow={(row, helpers) => {
+                  const model = row.original.model
+                  const isExpanded = expandedModels.has(model)
+
+                  return (
+                    <Fragment key={row.id}>
+                      <DataTableRow
+                        row={row}
+                        aria-expanded={isExpanded}
+                        getColumnClassName={(columnId) =>
+                          helpers.getCellClassName(columnId)
+                        }
+                        cellRenderColumns={table.options.columns}
+                      />
+                      {isExpanded && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={table.getVisibleLeafColumns().length}
+                            className='bg-muted/20 p-0'
+                          >
+                            <ModelTestHistoryPanel
+                              histories={testHistories[model] ?? []}
+                              isLoading={testHistoryQuery.isLoading}
+                              isError={testHistoryQuery.isError}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  )
+                }}
                 emptyContent={
                   models.length
                     ? t('No models matched your search.')
@@ -1183,6 +1389,86 @@ function ChannelTestDialogContent({
         }}
       />
     </>
+  )
+}
+
+function ModelTestHistoryPanel({
+  histories,
+  isLoading,
+  isError,
+}: {
+  histories: ChannelModelTestHistory[]
+  isLoading: boolean
+  isError: boolean
+}) {
+  const { t } = useTranslation()
+
+  let content
+  if (isLoading) {
+    content = (
+      <div className='text-muted-foreground flex items-center gap-2 px-3 py-4 text-sm'>
+        <Loader2 className='size-4 animate-spin' />
+        {t('Loading...')}
+      </div>
+    )
+  } else if (isError) {
+    content = (
+      <p className='text-destructive px-3 py-4 text-sm'>
+        {t('Failed to load test history.')}
+      </p>
+    )
+  } else if (histories.length === 0) {
+    content = (
+      <p className='text-muted-foreground px-3 py-4 text-sm'>
+        {t('No test history yet.')}
+      </p>
+    )
+  } else {
+    content = (
+      <div className='divide-y'>
+        <div className='text-muted-foreground grid grid-cols-[9.5rem_5.5rem_6rem_minmax(12rem,1fr)] gap-3 px-3 py-2 text-xs font-medium'>
+          <span>{t('Time')}</span>
+          <span>{t('Status')}</span>
+          <span>{t('Latency')}</span>
+          <span>{t('Result')}</span>
+        </div>
+        {histories.map((history) => (
+          <div
+            key={history.id}
+            className='grid grid-cols-[9.5rem_5.5rem_6rem_minmax(12rem,1fr)] items-center gap-3 px-3 py-2.5 text-xs'
+          >
+            <time className='text-muted-foreground tabular-nums'>
+              {formatTimestampToDate(history.tested_at)}
+            </time>
+            <StatusBadge
+              label={history.success ? t('Success') : t('Failed')}
+              variant={history.success ? 'success' : 'danger'}
+              size='sm'
+              copyable={false}
+            />
+            <span className='text-muted-foreground tabular-nums'>
+              {history.response_time >= 0
+                ? formatResponseTime(history.response_time, t)
+                : '-'}
+            </span>
+            <span
+              className='text-muted-foreground min-w-0 truncate'
+              title={history.message || undefined}
+            >
+              {history.message || '-'}
+              {history.error_code ? ` (${history.error_code})` : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <section aria-label={t('Recent test results')} className='min-w-max py-1'>
+      <h4 className='sr-only'>{t('Recent test results')}</h4>
+      {content}
+    </section>
   )
 }
 

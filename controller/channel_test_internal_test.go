@@ -162,6 +162,40 @@ func TestCopyChannelRejectsInvalidLegacyProxySettings(t *testing.T) {
 	assert.Equal(t, int64(1), channelCount)
 }
 
+func TestGetChannelModelTestResultsReturnsPersistedHistory(t *testing.T) {
+	db := setupModelListControllerTestDB(t)
+	channel := &model.Channel{Name: "history", Key: "test-key", Models: "gpt-test", Group: "default"}
+	require.NoError(t, db.Create(channel).Error)
+	_, err := model.RecordChannelModelTestResult(model.ChannelModelTestResultInput{
+		ChannelId:    channel.Id,
+		Model:        "gpt-test",
+		Success:      false,
+		ResponseTime: 321,
+		Message:      "upstream unavailable",
+		ErrorCode:    "upstream_error",
+	})
+	require.NoError(t, err)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", channel.Id)}}
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/channel/test/results", nil)
+
+	GetChannelModelTestResults(ctx)
+
+	var response struct {
+		Success bool                         `json:"success"`
+		Data    []model.ChannelModelTestItem `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	require.True(t, response.Success)
+	require.Len(t, response.Data, 1)
+	assert.Equal(t, "gpt-test", response.Data[0].Model)
+	assert.Equal(t, int64(321), response.Data[0].ResponseTime)
+	require.Len(t, response.Data[0].History, 1)
+	assert.Equal(t, "upstream unavailable", response.Data[0].History[0].Message)
+}
+
 func TestDeleteChannelResetsProxyCacheWhenPreReadFails(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
 	require.NoError(t, db.AutoMigrate(&model.Log{}))

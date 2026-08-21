@@ -466,28 +466,69 @@ func BatchDeleteChannels(ids []int) (int64, error) {
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	// 使用事务 分批删除channel表和abilities表
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return 0, tx.Error
-	}
+
+	var deletedCount int64
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var err error
+		deletedCount, err = deleteChannelsByIDs(tx, ids)
+		return err
+	})
+	return deletedCount, err
+}
+
+func deleteChannelsByIDs(tx *gorm.DB, ids []int) (int64, error) {
 	var deletedCount int64
 	for _, chunk := range lo.Chunk(ids, 200) {
-		result := tx.Where("id in (?)", chunk).Delete(&Channel{})
-		if result.Error != nil {
-			tx.Rollback()
-			return 0, result.Error
-		}
-		deletedCount += result.RowsAffected
-		if err := tx.Where("channel_id in (?)", chunk).Delete(&Ability{}).Error; err != nil {
-			tx.Rollback()
+		lockedIds, err := lockChannelIDs(tx, chunk)
+		if err != nil {
 			return 0, err
 		}
-	}
-	if err := tx.Commit().Error; err != nil {
-		return 0, err
+		count, err := deleteLockedChannelsByIDs(tx, lockedIds)
+		if err != nil {
+			return 0, err
+		}
+		deletedCount += count
 	}
 	return deletedCount, nil
+}
+
+func lockChannelIDs(tx *gorm.DB, ids []int) ([]int, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		if err := tx.Model(&Channel{}).
+			Where("id IN ?", ids).
+			Update("id", gorm.Expr("id")).Error; err != nil {
+			return nil, err
+		}
+	}
+	var channels []Channel
+	if err := lockForUpdate(tx).
+		Select("id").
+		Where("id IN ?", ids).
+		Find(&channels).Error; err != nil {
+		return nil, err
+	}
+	lockedIds := make([]int, 0, len(channels))
+	for _, channel := range channels {
+		lockedIds = append(lockedIds, channel.Id)
+	}
+	return lockedIds, nil
+}
+
+func deleteLockedChannelsByIDs(tx *gorm.DB, ids []int) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	if err := deleteChannelModelTestsForChannels(tx, ids); err != nil {
+		return 0, err
+	}
+	if err := tx.Where("channel_id IN ?", ids).Delete(&Ability{}).Error; err != nil {
+		return 0, err
+	}
+	result := tx.Where("id IN ?", ids).Delete(&Channel{})
+	return result.RowsAffected, result.Error
 }
 
 func (channel *Channel) GetPriority() int64 {
@@ -539,7 +580,7 @@ func (channel *Channel) Insert() error {
 	return err
 }
 
-func (channel *Channel) Update() error {
+func (channel *Channel) Update(forceUpdateFields ...string) error {
 	// If this is a multi-key channel, recalculate MultiKeySize based on the current key list to avoid inconsistency after editing keys
 	if channel.ChannelInfo.IsMultiKey {
 		var keyStr string
@@ -578,14 +619,49 @@ func (channel *Channel) Update() error {
 			}
 		}
 	}
-	var err error
-	err = DB.Model(channel).Updates(channel).Error
-	if err != nil {
-		return err
-	}
-	DB.Model(channel).First(channel, "id = ?", channel.Id)
-	err = channel.UpdateAbilities(nil)
-	return err
+
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(channel).Updates(channel).Error; err != nil {
+			return err
+		}
+		if len(forceUpdateFields) > 0 {
+			if err := tx.Model(&Channel{}).
+				Where("id = ?", channel.Id).
+				Select(forceUpdateFields).
+				Updates(channel).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.First(channel, "id = ?", channel.Id).Error; err != nil {
+			return err
+		}
+		if err := channel.UpdateAbilities(tx); err != nil {
+			return err
+		}
+		return deleteChannelModelTestsNotIn(tx, channel.Id, channel.Models)
+	})
+}
+
+func UpdateChannelModels(channelId int, models string, additionalUpdates map[string]any) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		updates := make(map[string]any, len(additionalUpdates)+1)
+		for key, value := range additionalUpdates {
+			updates[key] = value
+		}
+		updates["models"] = models
+		if err := tx.Model(&Channel{}).Where("id = ?", channelId).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		var channel Channel
+		if err := tx.First(&channel, "id = ?", channelId).Error; err != nil {
+			return err
+		}
+		if err := channel.UpdateAbilities(tx); err != nil {
+			return err
+		}
+		return deleteChannelModelTestsNotIn(tx, channel.Id, channel.Models)
+	})
 }
 
 func (channel *Channel) UpdateResponseTime(responseTime int64) {
@@ -609,13 +685,10 @@ func (channel *Channel) UpdateBalance(balance float64) {
 }
 
 func (channel *Channel) Delete() error {
-	var err error
-	err = DB.Delete(channel).Error
-	if err != nil {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		_, err := deleteChannelsByIDs(tx, []int{channel.Id})
 		return err
-	}
-	err = channel.DeleteAbilities()
-	return err
+	})
 }
 
 var channelStatusLock sync.Mutex
@@ -846,27 +919,38 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 		updateData.HeaderOverride = headerOverride
 	}
 
-	err := DB.Model(&Channel{}).Where("tag = ?", tag).Updates(updateData).Error
-	if err != nil {
-		return err
-	}
-	if shouldReCreateAbilities {
-		channels, err := GetChannelsByTag(updatedTag, false, false)
-		if err == nil {
-			for _, channel := range channels {
-				err = channel.UpdateAbilities(nil)
-				if err != nil {
-					common.SysLog(fmt.Sprintf("failed to update abilities: channel_id=%d, tag=%s, error=%v", channel.Id, channel.GetTag(), err))
-				}
-			}
-		}
-	} else {
-		err := UpdateAbilityByTag(tag, newTag, priority, weight)
-		if err != nil {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Channel{}).Where("tag = ?", tag).Updates(updateData).Error; err != nil {
 			return err
 		}
-	}
-	return nil
+		if shouldReCreateAbilities {
+			var channels []*Channel
+			if err := tx.Where("tag = ?", updatedTag).Find(&channels).Error; err != nil {
+				return err
+			}
+			for _, channel := range channels {
+				if err := channel.UpdateAbilities(tx); err != nil {
+					return err
+				}
+				if err := deleteChannelModelTestsNotIn(tx, channel.Id, channel.Models); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		ability := Ability{}
+		if newTag != nil {
+			ability.Tag = newTag
+		}
+		if priority != nil {
+			ability.Priority = priority
+		}
+		if weight != nil {
+			ability.Weight = *weight
+		}
+		return tx.Model(&Ability{}).Where("tag = ?", tag).Updates(ability).Error
+	})
 }
 
 func UpdateChannelUsedQuota(id int, quota int) {
@@ -885,13 +969,42 @@ func updateChannelUsedQuota(id int, quota int) {
 }
 
 func DeleteChannelByStatus(status int64) (int64, error) {
-	result := DB.Where("status = ?", status).Delete(&Channel{})
-	return result.RowsAffected, result.Error
+	return deleteChannelsByStatuses([]int64{status})
 }
 
 func DeleteDisabledChannel() (int64, error) {
-	result := DB.Where("status = ? or status = ?", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).Delete(&Channel{})
-	return result.RowsAffected, result.Error
+	return deleteChannelsByStatuses([]int64{
+		common.ChannelStatusAutoDisabled,
+		common.ChannelStatusManuallyDisabled,
+	})
+}
+
+func deleteChannelsByStatuses(statuses []int64) (int64, error) {
+	var deletedCount int64
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+			if err := tx.Model(&Channel{}).
+				Where("status IN ?", statuses).
+				Update("status", gorm.Expr("status")).Error; err != nil {
+				return err
+			}
+		}
+		var channels []Channel
+		if err := lockForUpdate(tx).
+			Select("id").
+			Where("status IN ?", statuses).
+			Find(&channels).Error; err != nil {
+			return err
+		}
+		ids := make([]int, 0, len(channels))
+		for _, channel := range channels {
+			ids = append(ids, channel.Id)
+		}
+		var err error
+		deletedCount, err = deleteLockedChannelsByIDs(tx, ids)
+		return err
+	})
+	return deletedCount, err
 }
 
 func GetPaginatedTags(offset int, limit int) ([]*string, error) {

@@ -27,6 +27,7 @@ import type {
   ChannelBalanceResponse,
   ChannelOpsResponse,
   ChannelTestResponse,
+  ChannelModelTestResultsResponse,
   CopyChannelParams,
   CopyChannelResponse,
   FetchModelsResponse,
@@ -206,6 +207,16 @@ export async function batchSetChannelTag(
 // ============================================================================
 // Channel Operations
 // ============================================================================
+
+export async function getChannelModelTestResults(
+  id: number
+): Promise<ChannelModelTestResultsResponse> {
+  const res = await api.get(
+    `/api/channel/test/${id}/results`,
+    channelActionConfig()
+  )
+  return res.data
+}
 
 /**
  * Test channel connectivity

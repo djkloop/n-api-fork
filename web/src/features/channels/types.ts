@@ -181,6 +181,35 @@ export interface ChannelOpsResponse {
   }
 }
 
+export interface ChannelModelTestHistory {
+  id: number
+  item_id: number
+  channel_id: number
+  success: boolean
+  response_time: number
+  tested_at: number
+  message: string
+  error_code: string
+}
+
+export interface ChannelModelTestItem {
+  id: number
+  channel_id: number
+  model: string
+  success: boolean
+  response_time: number
+  tested_at: number
+  message: string
+  error_code: string
+  history: ChannelModelTestHistory[]
+}
+
+export interface ChannelModelTestResultsResponse {
+  success: boolean
+  message?: string
+  data?: ChannelModelTestItem[]
+}
+
 export interface ChannelTestResponse {
   success: boolean
   message?: string
@@ -189,6 +218,7 @@ export interface ChannelTestResponse {
   data?: {
     response_time?: number
     error?: string
+    test_result?: ChannelModelTestItem
   }
 }
 

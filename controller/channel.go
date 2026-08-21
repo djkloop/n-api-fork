@@ -486,16 +486,14 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 	}
 
 	// 如果是添加操作，检查 channel 和 key 是否为空
-	if isAdd {
-		if channel.Key == "" {
-			return fmt.Errorf("channel cannot be empty")
-		}
+	if isAdd && channel.Key == "" {
+		return fmt.Errorf("channel cannot be empty")
+	}
 
-		// 检查模型名称长度是否超过 255
-		for _, m := range channel.GetModels() {
-			if len(m) > 255 {
-				return fmt.Errorf("模型名称过长: %s", m)
-			}
+	// 模型名称同时用于能力和测试记录索引，所有写入路径都必须遵守相同长度限制。
+	for _, m := range channel.GetModels() {
+		if len(strings.TrimSpace(m)) > 255 {
+			return fmt.Errorf("模型名称过长: %s", m)
 		}
 	}
 
@@ -1083,7 +1081,11 @@ func UpdateChannel(c *gin.Context) {
 			// 覆盖模式：直接使用新密钥（默认行为，不需要特殊处理）
 		}
 	}
-	err = channel.Update()
+	forceUpdateFields := make([]string, 0, 1)
+	if _, modelsProvided := requestData["models"]; modelsProvided {
+		forceUpdateFields = append(forceUpdateFields, "models")
+	}
+	err = channel.Update(forceUpdateFields...)
 	if err != nil {
 		common.ApiError(c, err)
 		return

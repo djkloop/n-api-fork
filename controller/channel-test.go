@@ -52,6 +52,22 @@ func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) s
 	return normalized
 }
 
+func resolveChannelTestModel(channel *model.Channel, requestedModel string) string {
+	requestedModel = strings.TrimSpace(requestedModel)
+	if requestedModel != "" {
+		return requestedModel
+	}
+	if channel.TestModel != nil && strings.TrimSpace(*channel.TestModel) != "" {
+		return strings.TrimSpace(*channel.TestModel)
+	}
+	for _, configuredModel := range channel.GetModels() {
+		if configuredModel = strings.TrimSpace(configuredModel); configuredModel != "" {
+			return configuredModel
+		}
+	}
+	return "gpt-4o-mini"
+}
+
 func resolveChannelTestUserID(c *gin.Context) (int, error) {
 	if c != nil {
 		if userID := c.GetInt("id"); userID > 0 {
@@ -92,20 +108,7 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	testModel = strings.TrimSpace(testModel)
-	if testModel == "" {
-		if channel.TestModel != nil && *channel.TestModel != "" {
-			testModel = strings.TrimSpace(*channel.TestModel)
-		} else {
-			models := channel.GetModels()
-			if len(models) > 0 {
-				testModel = strings.TrimSpace(models[0])
-			}
-			if testModel == "" {
-				testModel = "gpt-4o-mini"
-			}
-		}
-	}
+	testModel = resolveChannelTestModel(channel, testModel)
 
 	endpointType = normalizeChannelTestEndpoint(channel, endpointType)
 
@@ -854,7 +857,7 @@ func TestChannel(c *gin.Context) {
 	//		go func() { _ = channel.SaveChannelInfo() }()
 	//	}
 	//}()
-	testModel := c.Query("model")
+	testModel := resolveChannelTestModel(channel, c.Query("model"))
 	endpointType := c.Query("endpoint_type")
 	isStream, _ := strconv.ParseBool(c.Query("stream"))
 	testUserID, err := resolveChannelTestUserID(c)
@@ -868,11 +871,41 @@ func TestChannel(c *gin.Context) {
 		requestCtx = c.Request.Context()
 	}
 	result := testChannel(requestCtx, channel, testUserID, testModel, endpointType, isStream)
+	milliseconds := time.Since(tik).Milliseconds()
+
+	testSucceeded := result.localErr == nil && result.newAPIError == nil
+	testMessage := ""
+	errorCode := ""
+	if result.localErr != nil {
+		testMessage = result.localErr.Error()
+	} else if result.newAPIError != nil {
+		testMessage = result.newAPIError.Error()
+	}
+	if result.newAPIError != nil {
+		errorCode = string(result.newAPIError.GetErrorCode())
+	}
+	testItem, recordErr := model.RecordChannelModelTestResult(model.ChannelModelTestResultInput{
+		ChannelId:    channel.Id,
+		Model:        testModel,
+		Success:      testSucceeded,
+		ResponseTime: milliseconds,
+		Message:      testMessage,
+		ErrorCode:    errorCode,
+	})
+	if recordErr != nil {
+		common.SysError(fmt.Sprintf("failed to record channel model test: channel_id=%d, model=%s, error=%v", channel.Id, testModel, recordErr))
+	}
+	responseData := gin.H{"response_time": milliseconds}
+	if testItem != nil {
+		responseData["test_result"] = testItem
+	}
+
 	if result.localErr != nil {
 		resp := gin.H{
 			"success": false,
 			"message": result.localErr.Error(),
 			"time":    0.0,
+			"data":    responseData,
 		}
 		if result.newAPIError != nil {
 			resp["error_code"] = result.newAPIError.GetErrorCode()
@@ -880,8 +913,6 @@ func TestChannel(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	tok := time.Now()
-	milliseconds := tok.Sub(tik).Milliseconds()
 	go channel.UpdateResponseTime(milliseconds)
 	consumedTime := float64(milliseconds) / 1000.0
 	if result.newAPIError != nil {
@@ -890,6 +921,7 @@ func TestChannel(c *gin.Context) {
 			"message":    result.newAPIError.Error(),
 			"time":       consumedTime,
 			"error_code": result.newAPIError.GetErrorCode(),
+			"data":       responseData,
 		})
 		return
 	}
@@ -897,7 +929,26 @@ func TestChannel(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"time":    consumedTime,
+		"data":    responseData,
 	})
+}
+
+func GetChannelModelTestResults(c *gin.Context) {
+	channelId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if _, err := model.GetChannelById(channelId, false); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	items, err := model.GetChannelModelTestItems(channelId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, items)
 }
 
 // channelTestSummary records the outcome of one channel test cycle so the
