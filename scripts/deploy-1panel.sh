@@ -5,6 +5,7 @@ SOURCE_DIR="${SOURCE_DIR:-/opt/1panel/apps/new-api-source}"
 APP_DIR="${APP_DIR:-/opt/1panel/apps/new-api/new-api}"
 COMPOSE_FILE="${COMPOSE_FILE:-${APP_DIR}/docker-compose.yml}"
 BRANCH="${BRANCH:-main}"
+DEPLOY_COMMIT="${DEPLOY_COMMIT:-}"
 SERVICE_NAME="${SERVICE_NAME:-new-api}"
 CONTAINER_NAME="${CONTAINER_NAME:-1Panel-new-api-ljkr}"
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-new-api-custom}"
@@ -27,6 +28,7 @@ done
 
 [[ -d "${SOURCE_DIR}/.git" ]] || fail "source repository not found: ${SOURCE_DIR}"
 [[ -f "$COMPOSE_FILE" ]] || fail "compose file not found: ${COMPOSE_FILE}"
+[[ -z "$DEPLOY_COMMIT" || "$DEPLOY_COMMIT" =~ ^[0-9a-fA-F]{7,40}$ ]] || fail "DEPLOY_COMMIT must be a 7-40 character Git commit"
 [[ "$HEALTH_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || fail "HEALTH_TIMEOUT must be a positive integer"
 
 if [[ "${DEPLOY_LOCK_HELD:-0}" != "1" ]]; then
@@ -41,10 +43,15 @@ fi
 
 log "fetching origin/${BRANCH}"
 git fetch origin "$BRANCH"
-if [[ "$(git branch --show-current)" != "$BRANCH" ]]; then
-  git checkout "$BRANCH"
+if [[ -n "$DEPLOY_COMMIT" ]]; then
+  git cat-file -e "${DEPLOY_COMMIT}^{commit}" 2>/dev/null || fail "DEPLOY_COMMIT was not found after fetch: ${DEPLOY_COMMIT}"
+  git checkout --detach "$DEPLOY_COMMIT"
+else
+  if [[ "$(git branch --show-current)" != "$BRANCH" ]]; then
+    git checkout "$BRANCH"
+  fi
+  git merge --ff-only "origin/${BRANCH}"
 fi
-git merge --ff-only "origin/${BRANCH}"
 
 # Continue with the newly pulled version of this script.
 if [[ "${DEPLOY_SCRIPT_REEXEC:-0}" != "1" ]]; then
@@ -54,6 +61,7 @@ if [[ "${DEPLOY_SCRIPT_REEXEC:-0}" != "1" ]]; then
     APP_DIR="$APP_DIR" \
     COMPOSE_FILE="$COMPOSE_FILE" \
     BRANCH="$BRANCH" \
+    DEPLOY_COMMIT="$DEPLOY_COMMIT" \
     SERVICE_NAME="$SERVICE_NAME" \
     CONTAINER_NAME="$CONTAINER_NAME" \
     IMAGE_REPOSITORY="$IMAGE_REPOSITORY" \

@@ -1,0 +1,23 @@
+{
+  "primary": {
+    "sourceDir": "/opt/1panel/apps/new-api-source",
+    "deployScript": "/opt/1panel/apps/new-api-source/scripts/deploy-1panel.sh"
+  },
+  "secondary": {
+    "host": "root@100.81.96.85",
+    "identityFile": "/root/.ssh/new-api-node2-deploy",
+    "sourceDir": "/opt/1panel/apps/new-api-source",
+    "appDir": "/opt/1panel/apps/new-api-node2",
+    "composeFile": "/opt/1panel/apps/new-api-node2/docker-compose.yml",
+    "branch": "main",
+    "serviceName": "new-api",
+    "containerName": "new-api-node-2",
+    "imageRepository": "new-api-custom",
+    "healthTimeout": 180
+  },
+  "ssh": {
+    "connectTimeoutSeconds": 15
+  },
+  "commandTimeoutSeconds": 3600,
+  "lockFile": "/tmp/new-api-cluster-deploy.lock"
+}
