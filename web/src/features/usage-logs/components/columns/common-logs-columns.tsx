@@ -531,6 +531,29 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
             </button>
           )
         },
+      },
+      {
+        id: 'request_host',
+        header: t('Request Domain'),
+        accessorFn: (row) =>
+          parseLogOther(row.other)?.admin_info?.request_host ?? '',
+        cell: ({ row }) => {
+          const requestHost = row.getValue('request_host') as string
+          if (!requestHost) {
+            return <span className='text-muted-foreground/60 text-xs'>-</span>
+          }
+
+          return (
+            <span
+              className='block max-w-[180px] truncate font-mono text-xs'
+              title={requestHost}
+            >
+              {requestHost}
+            </span>
+          )
+        },
+        meta: { label: t('Request Domain') },
+        size: 180,
       }
     )
   }
