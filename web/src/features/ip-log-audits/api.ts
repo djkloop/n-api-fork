@@ -46,6 +46,7 @@ export type IPLogAuditEvent = {
   completion_tokens: number
   use_time: number
   request_id: string
+  request_host: string
 }
 
 type ApiResult<T> = {

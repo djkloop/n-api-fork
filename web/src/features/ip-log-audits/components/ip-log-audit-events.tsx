@@ -73,6 +73,7 @@ export function IPLogAuditEvents(props: Props) {
               <TableHead>{t('Event type')}</TableHead>
               <TableHead>{t('User')}</TableHead>
               <TableHead>{t('Model')}</TableHead>
+              <TableHead>{t('Request Domain')}</TableHead>
               <TableHead>{t('Quota')}</TableHead>
               <TableHead>{t('Tokens')}</TableHead>
               <TableHead>{t('Request ID')}</TableHead>
@@ -90,6 +91,9 @@ export function IPLogAuditEvents(props: Props) {
                 <TableCell>{event.username || t('Unknown')}</TableCell>
                 <TableCell className='max-w-48 truncate'>
                   {event.model_name || t('Unknown')}
+                </TableCell>
+                <TableCell className='max-w-56 truncate font-mono text-xs'>
+                  {event.request_host || '-'}
                 </TableCell>
                 <TableCell>{formatNumber(event.quota)}</TableCell>
                 <TableCell className='whitespace-nowrap'>

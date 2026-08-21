@@ -40,6 +40,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -49,6 +50,30 @@ import { ROLE } from '@/lib/roles'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const role = useAuthStore((state) => state.auth.user?.role) ?? ROLE.GUEST
+  const superAdminGroups: SidebarData['navGroups'] =
+    role >= ROLE.SUPER_ADMIN
+      ? [
+          {
+            id: 'super-admin',
+            title: t('Super Admin'),
+            items: [
+              {
+                title: t('IP Blackroom'),
+                url: '/ip-bans',
+                icon: ShieldBan,
+                requiredRole: ROLE.SUPER_ADMIN,
+              },
+              {
+                title: t('IP Log Audit'),
+                url: '/ip-log-audits',
+                icon: ScanSearch,
+                requiredRole: ROLE.SUPER_ADMIN,
+              },
+            ],
+          },
+        ]
+      : []
 
   return {
     navGroups: [
@@ -142,16 +167,6 @@ export function useSidebarData(): SidebarData {
             icon: Ticket,
           },
           {
-            title: t('IP Blackroom'),
-            url: '/ip-bans',
-            icon: ShieldBan,
-          },
-          {
-            title: t('IP Log Audit'),
-            url: '/ip-log-audits',
-            icon: ScanSearch,
-          },
-          {
             title: t('Subscriptions'),
             url: '/subscriptions',
             icon: CreditCard,
@@ -170,6 +185,7 @@ export function useSidebarData(): SidebarData {
           },
         ],
       },
+      ...superAdminGroups,
     ],
   }
 }

@@ -676,6 +676,14 @@ export function DetailsDialog(props: DetailsDialogProps) {
             <DetailRow label={t('Retry Chain')} value={channelChain} mono />
           )}
 
+          {props.isAdmin && adminInfo?.request_host && (
+            <DetailRow
+              label={t('Request Domain')}
+              value={adminInfo.request_host}
+              mono
+            />
+          )}
+
           {props.log.token_name && (
             <DetailRow label={t('Token')} value={props.log.token_name} mono />
           )}

@@ -5,6 +5,9 @@ const dir = path.resolve('src/i18n/locales')
 const values = {
   en: {
     Automatic: 'Automatic',
+    'Request Domain': 'Request Domain',
+    'Security auditing tools restricted to super administrators.':
+      'Security auditing tools restricted to super administrators.',
     'Block IP': 'Block IP',
     'Block IP {{ip}}': 'Block IP {{ip}}',
     'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
@@ -27,6 +30,9 @@ const values = {
   },
   zh: {
     Automatic: '自动',
+    'Request Domain': '请求域名',
+    'Security auditing tools restricted to super administrators.':
+      '仅限超级管理员使用的安全审计工具。',
     'Block IP': '封禁 IP',
     'Block IP {{ip}}': '封禁 IP {{ip}}',
     'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
@@ -49,6 +55,9 @@ const values = {
   },
   'zh-TW': {
     Automatic: '自動',
+    'Request Domain': '請求網域',
+    'Security auditing tools restricted to super administrators.':
+      '僅限超級管理員使用的安全稽核工具。',
     'Block IP': '封鎖 IP',
     'Block IP {{ip}}': '封鎖 IP {{ip}}',
     'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
@@ -71,6 +80,9 @@ const values = {
   },
   fr: {
     Automatic: 'Automatique',
+    'Request Domain': 'Domaine de requête',
+    'Security auditing tools restricted to super administrators.':
+      'Outils d’audit de sécurité réservés aux super administrateurs.',
     'Block IP': 'Bloquer l’IP',
     'Block IP {{ip}}': 'Bloquer l’IP {{ip}}',
     'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
@@ -93,6 +105,9 @@ const values = {
   },
   ja: {
     Automatic: '自動',
+    'Request Domain': 'リクエストドメイン',
+    'Security auditing tools restricted to super administrators.':
+      'スーパー管理者専用のセキュリティ監査ツール。',
     'Block IP': 'IP をブロック',
     'Block IP {{ip}}': 'IP {{ip}} をブロック',
     'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
@@ -115,6 +130,9 @@ const values = {
   },
   ru: {
     Automatic: 'Автоматически',
+    'Request Domain': 'Домен запроса',
+    'Security auditing tools restricted to super administrators.':
+      'Инструменты аудита безопасности только для суперадминистраторов.',
     'Block IP': 'Заблокировать IP',
     'Block IP {{ip}}': 'Заблокировать IP {{ip}}',
     'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':
@@ -137,6 +155,9 @@ const values = {
   },
   vi: {
     Automatic: 'Tự động',
+    'Request Domain': 'Tên miền yêu cầu',
+    'Security auditing tools restricted to super administrators.':
+      'Công cụ kiểm tra bảo mật chỉ dành cho siêu quản trị viên.',
     'Block IP': 'Chặn IP',
     'Block IP {{ip}}': 'Chặn IP {{ip}}',
     'Block registration from {{ip}} for 24 hours? You can unblock it later from IP Blackroom.':

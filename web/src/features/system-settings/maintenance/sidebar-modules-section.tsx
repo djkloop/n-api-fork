@@ -81,6 +81,12 @@ export function SidebarModulesSection({
       title: t('Admin area'),
       description: t('Global configuration and administrative tools.'),
     },
+    superAdmin: {
+      title: t('Super Admin'),
+      description: t(
+        'Security auditing tools restricted to super administrators.'
+      ),
+    },
   }
 
   const moduleMeta: Record<
@@ -154,6 +160,8 @@ export function SidebarModulesSection({
         title: t('Subscription Management'),
         description: t('Manage subscription plans and pricing.'),
       },
+    },
+    superAdmin: {
       ipBan: {
         title: t('IP Blackroom'),
         description: t('Manage manual and automatic registration IP blocks.'),

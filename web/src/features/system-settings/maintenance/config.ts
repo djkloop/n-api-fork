@@ -83,6 +83,9 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     user: true,
     setting: true,
     subscription: true,
+  },
+  superAdmin: {
+    enabled: true,
     ipBan: true,
     ipLogAudit: true,
   },
@@ -196,6 +199,14 @@ export function parseSidebarModulesAdmin(
 
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>
+    const legacyAdmin = parsed.admin as Record<string, unknown> | undefined
+    if (!parsed.superAdmin && legacyAdmin) {
+      parsed.superAdmin = {
+        enabled: toBoolean(legacyAdmin.enabled, true),
+        ipBan: toBoolean(legacyAdmin.ipBan, true),
+        ipLogAudit: toBoolean(legacyAdmin.ipLogAudit, true),
+      }
+    }
     const result: SidebarModulesAdminConfig = {}
 
     Object.entries(parsed).forEach(([sectionKey, raw]) => {
@@ -235,6 +246,9 @@ export function parseSidebarModulesAdmin(
         }
       })
     })
+
+    delete result.admin?.ipBan
+    delete result.admin?.ipLogAudit
 
     return result
   } catch {

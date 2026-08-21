@@ -149,6 +149,8 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 		requestPath = strings.Replace(requestPath, ":generateContent", ":streamGenerateContent", 1)
 	}
 	c.Request = httptest.NewRequestWithContext(ctx, http.MethodPost, requestPath, nil)
+	// This is an internal synthetic request, not traffic received by a public domain.
+	c.Request.Host = ""
 
 	cache, err := model.GetUserCache(testUserID)
 	if err != nil {

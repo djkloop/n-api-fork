@@ -147,15 +147,20 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.PUT("/", controller.UpdateUser)
 				adminRoute.DELETE("/:id", controller.DeleteUser)
 				adminRoute.DELETE("/:id/reset_passkey", controller.AdminResetPasskey)
-				adminRoute.GET("/ip-bans", controller.GetIPBans)
-				adminRoute.POST("/ip-bans", controller.CreateIPBan)
-				adminRoute.DELETE("/ip-bans/:id", controller.ReleaseIPBan)
-				adminRoute.GET("/ip-log-audits", controller.GetIPLogAudits)
-				adminRoute.GET("/ip-log-audits/:ip/logs", controller.GetIPLogAuditEvents)
 
 				// Admin 2FA routes
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)
 				adminRoute.DELETE("/:id/2fa", controller.AdminDisable2FA)
+			}
+
+			rootRoute := userRoute.Group("/")
+			rootRoute.Use(middleware.RootAuth())
+			{
+				rootRoute.GET("/ip-bans", controller.GetIPBans)
+				rootRoute.POST("/ip-bans", controller.CreateIPBan)
+				rootRoute.DELETE("/ip-bans/:id", controller.ReleaseIPBan)
+				rootRoute.GET("/ip-log-audits", controller.GetIPLogAudits)
+				rootRoute.GET("/ip-log-audits/:ip/logs", controller.GetIPLogAuditEvents)
 			}
 		}
 

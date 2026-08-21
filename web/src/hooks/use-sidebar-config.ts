@@ -63,6 +63,9 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     user: true,
     setting: true,
     subscription: true,
+  },
+  superAdmin: {
+    enabled: true,
     ipBan: true,
     ipLogAudit: true,
   },
@@ -116,8 +119,8 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/users': { section: 'admin', module: 'user' },
   '/redemption-codes': { section: 'admin', module: 'redemption' },
   '/subscriptions': { section: 'admin', module: 'subscription' },
-  '/ip-bans': { section: 'admin', module: 'ipBan' },
-  '/ip-log-audits': { section: 'admin', module: 'ipLogAudit' },
+  '/ip-bans': { section: 'superAdmin', module: 'ipBan' },
+  '/ip-log-audits': { section: 'superAdmin', module: 'ipLogAudit' },
   '/system-settings': { section: 'admin', module: 'setting' },
   '/system-settings/site': { section: 'admin', module: 'setting' },
 }
@@ -135,6 +138,14 @@ function parseSidebarConfig(
 
   try {
     const parsed = JSON.parse(value) as SidebarModulesAdminConfig
+    const legacyAdmin = parsed.admin
+    if (!parsed.superAdmin && legacyAdmin) {
+      parsed.superAdmin = {
+        enabled: legacyAdmin.enabled !== false,
+        ipBan: legacyAdmin.ipBan !== false,
+        ipLogAudit: legacyAdmin.ipLogAudit !== false,
+      }
+    }
     return mergeWithDefaultSidebarModules(parsed)
   } catch {
     // eslint-disable-next-line no-console
